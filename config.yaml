@@ -6,6 +6,8 @@ docker:
   max_concurrency: 3
   timeout: "30m"
   settings_path: "./settings.json"
+  git_user_name: "cgate-bot"
+  git_user_email: "cgate-bot@users.noreply.github.com"
 
 github:
   webhook_secret: "${GITHUB_WEBHOOK_SECRET}"

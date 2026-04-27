@@ -40,6 +40,12 @@ func Init() (*App, error) {
 	if err := viper.BindEnv("docker.settings_path", "DOCKER_SETTINGS_PATH"); err != nil {
 		slog.Warn("bind env", "error", err)
 	}
+	if err := viper.BindEnv("docker.git_user_name", "GIT_USER_NAME"); err != nil {
+		slog.Warn("bind env", "error", err)
+	}
+	if err := viper.BindEnv("docker.git_user_email", "GIT_USER_EMAIL"); err != nil {
+		slog.Warn("bind env", "error", err)
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		slog.Warn("no config file found, using defaults and env vars")
@@ -54,6 +60,8 @@ func Init() (*App, error) {
 			MaxConcurrency: viper.GetInt("docker.max_concurrency"),
 			Timeout:        viper.GetDuration("docker.timeout"),
 			SettingsPath:   viper.GetString("docker.settings_path"),
+			GitUserName:    viper.GetString("docker.git_user_name"),
+			GitUserEmail:   viper.GetString("docker.git_user_email"),
 		},
 		Queue: domain.QueueConfig{
 			MaxRetries: viper.GetInt("queue.max_retries"),
@@ -79,6 +87,12 @@ func Init() (*App, error) {
 	}
 	if cfg.Queue.MaxRetries == 0 {
 		cfg.Queue.MaxRetries = 1
+	}
+	if cfg.Docker.GitUserName == "" {
+		cfg.Docker.GitUserName = "cgate-bot"
+	}
+	if cfg.Docker.GitUserEmail == "" {
+		cfg.Docker.GitUserEmail = "cgate-bot@users.noreply.github.com"
 	}
 
 	dbPath := viper.GetString("database.path")
