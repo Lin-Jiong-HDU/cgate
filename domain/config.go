@@ -18,6 +18,8 @@ type DockerConfig struct {
 	MaxConcurrency int
 	Timeout        time.Duration
 	SettingsPath   string
+	GitUserName    string
+	GitUserEmail   string
 }
 
 type QueueConfig struct {
