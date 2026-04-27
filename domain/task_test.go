@@ -18,7 +18,10 @@ func TestNewTask_ConstructsFromPayload(t *testing.T) {
 		URL:         "https://github.com/owner/repo/issues/42",
 	}
 
-	task := domain.NewTask(payload)
+	task, err := domain.NewTask(payload)
+	if err != nil {
+		t.Fatalf("NewTask returned error: %v", err)
+	}
 
 	if task.ID == "" {
 		t.Error("expected non-empty ID")
@@ -49,8 +52,8 @@ func TestNewTask_ConstructsFromPayload(t *testing.T) {
 func TestNewTask_GeneratesUniqueIDs(t *testing.T) {
 	t.Parallel()
 	payload := domain.WebhookPayload{IssueNumber: 1}
-	task1 := domain.NewTask(payload)
-	task2 := domain.NewTask(payload)
+	task1, _ := domain.NewTask(payload)
+	task2, _ := domain.NewTask(payload)
 
 	if task1.ID == task2.ID {
 		t.Error("expected unique IDs")

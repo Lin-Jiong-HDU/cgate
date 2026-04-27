@@ -9,26 +9,27 @@ import (
 type TaskStatus string
 
 const (
-	TaskStatusPending   TaskStatus = "pending"
-	TaskStatusRunning   TaskStatus = "running"
-	TaskStatusSucceeded TaskStatus = "succeeded"
-	TaskStatusFailed    TaskStatus = "failed"
+	TaskStatusPending    TaskStatus = "pending"
+	TaskStatusRunning    TaskStatus = "running"
+	TaskStatusSucceeded  TaskStatus = "succeeded"
+	TaskStatusFailed     TaskStatus = "failed"
+	TaskStatusCancelled  TaskStatus = "cancelled"
 )
 
 type Task struct {
-	ID          string
-	IssueNumber int
-	Title       string
-	Body        string
-	Author      string
-	Repository  string
-	HTMLURL     string
-	Status      TaskStatus
-	ContainerID string
-	Log         string
-	CreatedAt   time.Time
-	StartedAt   *time.Time
-	FinishedAt  *time.Time
+	ID          string     `json:"id"`
+	IssueNumber int        `json:"issue_number"`
+	Title       string     `json:"title"`
+	Body        string     `json:"body"`
+	Author      string     `json:"author"`
+	Repository  string     `json:"repository"`
+	HTMLURL     string     `json:"html_url"`
+	Status      TaskStatus `json:"status"`
+	ContainerID string     `json:"container_id"`
+	Log         string     `json:"log"`
+	CreatedAt   time.Time  `json:"created_at"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
 }
 
 type WebhookPayload struct {
@@ -43,8 +44,11 @@ type WebhookPayload struct {
 	CreatedAt   string   `json:"created_at"`
 }
 
-func NewTask(payload WebhookPayload) Task {
-	id := generateID()
+func NewTask(payload WebhookPayload) (Task, error) {
+	id, err := generateID()
+	if err != nil {
+		return Task{}, err
+	}
 	return Task{
 		ID:          id,
 		IssueNumber: payload.IssueNumber,
@@ -55,11 +59,13 @@ func NewTask(payload WebhookPayload) Task {
 		HTMLURL:     payload.URL,
 		Status:      TaskStatusPending,
 		CreatedAt:   time.Now(),
-	}
+	}, nil
 }
 
-func generateID() string {
+func generateID() (string, error) {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
