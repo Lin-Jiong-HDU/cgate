@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
 	"github.com/docker/docker/api/types/container"
@@ -33,19 +32,18 @@ func NewRunner(cfg domain.DockerConfig, apiKey, githubToken, cgateURL string) do
 }
 
 func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, error) {
-	timeout := r.cfg.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Minute
-	}
-
-	_ = timeout
-
-	prompt := fmt.Sprintf("处理 Issue #%d: %s\n%s", task.IssueNumber, task.Title, task.Body)
-
 	env := []string{
 		fmt.Sprintf("ANTHROPIC_API_KEY=%s", r.apiKey),
 		fmt.Sprintf("GITHUB_TOKEN=%s", r.githubToken),
 		fmt.Sprintf("CGATE_URL=%s", r.cgateURL),
+		fmt.Sprintf("REPOSITORY=%s", task.Repository),
+		fmt.Sprintf("ISSUE_NUMBER=%d", task.IssueNumber),
+		fmt.Sprintf("ISSUE_TITLE=%s", task.Title),
+		fmt.Sprintf("ISSUE_BODY=%s", task.Body),
+		fmt.Sprintf("ISSUE_URL=%s", task.HTMLURL),
+		fmt.Sprintf("GIT_USER_NAME=%s", r.cfg.GitUserName),
+		fmt.Sprintf("GIT_USER_EMAIL=%s", r.cfg.GitUserEmail),
+		fmt.Sprintf("MAX_TURNS=%d", 15),
 	}
 
 	mounts := []mount.Mount{
@@ -68,7 +66,7 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 	resp, err := r.cli.ContainerCreate(ctx, &container.Config{
 		Image: r.cfg.Image,
 		Env:   env,
-		Cmd:   []string{"claude", "--max-turns", "15", "--prompt", prompt},
+		Cmd:   []string{"/entrypoint.sh"},
 		Tty:   false,
 	}, &container.HostConfig{
 		Mounts: mounts,
