@@ -1,0 +1,32 @@
+name: Issue Webhook
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: read
+
+jobs:
+  notify:
+    # Only trigger when issue title ends with [claude bot]
+    if: endsWith(github.event.issue.title, '[claude bot]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send issue to webhook
+        run: |
+          curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
+            -d '{
+                "action": "opened",
+                "issue_number": ${{ github.event.issue.number }},
+                "title": ${{ toJson(github.event.issue.title) }},
+                "body": ${{ toJson(github.event.issue.body) }},
+                "author": "${{ github.event.issue.user.login }}",
+                "labels": ${{ toJson(github.event.issue.labels.*.name) }},
+                "url": "${{ github.event.issue.html_url }}",
+                "repository": "${{ github.repository }}",
+                "created_at": "${{ github.event.issue.created_at }}"
+              }'

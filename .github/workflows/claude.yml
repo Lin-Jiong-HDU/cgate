@@ -1,0 +1,49 @@
+name: Claude Code
+
+# Disabled by default — only runs on manual trigger.
+# To enable automatic triggers, uncomment the 'on' section below
+# and remove or replace the workflow_dispatch trigger.
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to process"
+        required: false
+        type: string
+      prompt:
+        description: "Custom prompt (overrides issue body)"
+        required: false
+        type: string
+
+# --- Automatic triggers (uncomment to enable) ---
+# on:
+#   issue_comment:
+#     types: [created]
+#   issues:
+#     types: [opened, assigned]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 15"

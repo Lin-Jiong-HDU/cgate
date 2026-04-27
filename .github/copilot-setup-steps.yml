@@ -1,0 +1,14 @@
+steps:
+  - name: Set up Go
+    uses: actions/setup-go@v5
+    with:
+      go-version-file: go.mod
+      cache: true
+
+  - name: Install Go tools
+    run: |
+      go install github.com/vektra/mockery/v2@latest
+      go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+  - name: Download dependencies
+    run: go mod download
