@@ -12,4 +12,6 @@ services:
       - GITHUB_PAT=${GITHUB_PAT}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - CGATE_URL=${CGATE_URL}
+      - GIT_USER_NAME=${GIT_USER_NAME:-cgate-bot}
+      - GIT_USER_EMAIL=${GIT_USER_EMAIL:-cgate-bot@users.noreply.github.com}
     restart: unless-stopped

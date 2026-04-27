@@ -1,4 +1,4 @@
-.PHONY: build test lint run tidy clean docker-build docker-up docker-down
+.PHONY: build test lint run tidy clean docker-build docker-build-runner docker-build-all docker-up docker-down
 
 BINARY_NAME=cgate
 
@@ -22,6 +22,11 @@ clean:
 
 docker-build:
 	docker build -t cgate:latest .
+
+docker-build-runner:
+	docker build -t claude-code-runner:latest ./runner-image/
+
+docker-build-all: docker-build docker-build-runner
 
 docker-up:
 	docker compose up -d
