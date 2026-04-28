@@ -1,170 +1,127 @@
-# Go Project Template
+# CGate
 
-A Go 1.24+ project template with built-in AI coding assistant instructions, CI/CD pipelines, and automated issue processing. Start a new project with conventions, tooling, and AI support already wired up.
+Self-hosted automation gateway that connects GitHub issues to [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Create an issue titled `... [claude bot]`, and CGate spins up an isolated Docker container that runs Claude Code to implement the feature, run tests, and open a pull request — automatically.
+
+## How It Works
+
+```
+GitHub Issue [... claude bot]
+  → GitHub Actions sends webhook to CGate
+    → CGate creates a Task, enqueues it
+      → Scheduler launches an isolated Docker container
+        → Container clones repo, runs Claude Code
+          → Claude implements, tests, commits, opens a PR
+```
 
 ## Features
 
-- **Zero dependencies** — pure Go standard library skeleton
-- **AI-ready** — instruction files for Claude Code, GitHub Copilot, and Cursor
-- **Two project modes** — CLI/Library (flat) or Web (Clean Architecture)
-- **CI/CD pipeline** — automated vet, build, test, and lint on every push
-- **Issue-driven automation** — create an issue to trigger a remote AI agent
-- **Makefile** — common commands out of the box
-
-## Issue-Driven Automation
-
-This template's core feature: **create a GitHub issue, and a remote AI agent implements it for you.**
-
-### How it works
-
-```
-GitHub Issue  ──[claude bot]──►  GitHub Actions  ──webhook──►  Your Server (Claude Code)
-                                                                        │
-                                                                        ▼
-                                                                 Pull → Branch → Implement → Test → PR
-```
-
-1. Create an issue with title ending in `[claude bot]`, e.g.: `Add user login API [claude bot]`
-2. GitHub Actions sends the issue content to your server webhook
-3. Your server-side Claude Code receives it and:
-   - Pulls the latest code from `main`
-   - Creates a feature branch (`feat/issue-{number}-{desc}`)
-   - Implements the task following the five-phase workflow
-   - Runs all pipeline gates (vet, build, test, lint)
-   - Pushes the branch and opens a pull request
-   - Comments on the issue with the PR link
-
-### Setup
-
-1. **Deploy Claude Code on your server** with a webhook endpoint that accepts POST requests
-2. **Add repository secrets** in GitHub (Settings → Secrets and variables → Actions):
-   - `WEBHOOK_URL` — your server endpoint (e.g. `https://your-server.com/webhook/issue`)
-   - `WEBHOOK_SECRET` — shared secret for request verification
-   - `ANTHROPIC_API_KEY` — your Anthropic API key
-3. **Create an issue** with `[claude bot]` at the end of the title — that's it
-
-### Webhook payload
-
-Your server receives a JSON POST like this:
-
-```json
-{
-  "action": "opened",
-  "issue_number": 42,
-  "title": "Add user login API [claude bot]",
-  "body": "Use JWT for authentication...",
-  "author": "username",
-  "labels": ["enhancement"],
-  "url": "https://github.com/owner/repo/issues/42",
-  "repository": "owner/repo",
-  "created_at": "2026-04-27T12:00:00Z"
-}
-```
-
-Verify the `X-Webhook-Secret` header matches your configured secret before processing.
-
-### Claude Code Action (manual trigger)
-
-`.github/workflows/claude.yml` provides an on-demand Claude Code run. Go to **Actions → Claude Code → Run workflow** and optionally pass an issue number or custom prompt.
+- **Issue-driven automation** — open a GitHub issue, get a PR
+- **Docker-isolated execution** — each task runs in its own container
+- **Concurrency control** — configurable max parallel tasks (default: 3)
+- **Task lifecycle** — pending → running → succeeded / failed / cancelled
+- **REST API** — list, inspect, cancel, and read logs for tasks
+- **Persistence** — SQLite storage, survives restarts
+- **Recovery** — re-enqueues pending tasks and re-attaches to running containers on restart
 
 ## Quick Start
 
-### 1. Create your project
+### Prerequisites
 
-Click **"Use this template"** on GitHub, or:
+- Go 1.24+
+- Docker
+- GitHub PAT with repo permissions
+- Anthropic API key
+
+### 1. Build
 
 ```bash
-git clone https://github.com/Lin-Jiong-HDU/go-project-template.git my-project
-cd my-project
-rm -rf .git
-git init
+make docker-build-all
 ```
 
-### 2. Update module path
+This builds both the server image and the runner image (`claude-code-runner`).
 
-Edit `go.mod` and replace the module path:
+### 2. Configure
+
+Copy `config.yaml` and adjust as needed:
+
+```yaml
+server:
+  port: 8080
+
+docker:
+  runner_image: claude-code-runner:latest
+  max_concurrency: 3
+
+database:
+  path: ./data/cgate.db
+```
+
+### 3. Run
+
+```bash
+docker compose up -d
+```
+
+Set the following environment variables (via `docker-compose.yml` or `.env`):
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_WEBHOOK_SECRET` | Secret for webhook authentication |
+| `GITHUB_PAT` | GitHub personal access token (injected into runner containers) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (injected into runner containers) |
+
+### 4. Set up the GitHub webhook
+
+In your target repository, configure a GitHub Actions workflow that POSTs issue data to CGate. See `.github/workflows/issue-webhook.yml` for a ready-made workflow.
+
+Alternatively, use the manual trigger workflow (`.github/workflows/claude.yml`) from the Actions tab.
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/webhook/github` | Receive GitHub issue webhook |
+| `GET` | `/api/tasks` | List tasks (optional `?status=` filter) |
+| `GET` | `/api/tasks/{id}` | Get task detail |
+| `POST` | `/api/tasks/{id}/cancel` | Cancel a running task |
+| `GET` | `/api/tasks/{id}/logs` | Get task container logs |
+
+## Architecture
+
+Clean Architecture with strict one-way dependency:
 
 ```
-module github.com/YOUR_USERNAME/YOUR_PROJECT
+route → controller → usecase → repository → domain
 ```
-
-### 3. Choose project type
-
-**CLI / Library** — keep the flat structure as-is:
-
-```
-├── main.go
-├── internal/
-├── go.mod
-└── Makefile
-```
-
-**Web (Clean Architecture)** — restructure into layers:
 
 ```
 ├── cmd/main.go               # Entry point
-├── domain/                   # Entities + interfaces (imports nothing)
-├── usecase/                  # Business logic
-├── repository/               # Data access
-├── api/controller/           # HTTP handlers
-├── api/middleware/            # HTTP middleware
-├── api/route/                # Route registration + DI wiring
-├── bootstrap/                # App initialization
-├── internal/                 # Shared utilities
-├── mocks/                    # Generated mocks
-├── go.mod
-└── Makefile
+├── domain/                   # Entities + interfaces (no project imports)
+├── usecase/                  # Business logic (scheduler, webhook handling)
+├── repository/               # SQLite persistence
+├── api/
+│   ├── controller/           # HTTP handlers
+│   ├── middleware/           # Webhook authentication
+│   └── route/                # Route registration + DI wiring
+├── bootstrap/                # App initialization (config, DB, Docker client)
+├── internal/
+│   ├── docker/               # Docker container management
+│   └── queue/                # Buffered channel-based task queue
+├── runner-image/             # Runner Dockerfile + entrypoint + prompt template
+├── config.yaml
+├── docker-compose.yml
+└── Dockerfile                # Server multi-stage build
 ```
 
-Dependency direction is strictly enforced: `route → controller → usecase → repository → domain`.
-
-### 4. Start coding
+## Development
 
 ```bash
-make build     # Build the binary
-make test      # Run tests with coverage
-make lint      # Run linter (requires golangci-lint)
-make run       # Run the application
+make build              # Build binary
+make run                # Run locally
+make test               # Run tests with coverage
+make lint               # Run golangci-lint
+make docker-test        # Run Docker image integration tests
 ```
-
-## AI Assistant Support
-
-The template ships with instruction files so AI tools understand your project conventions immediately:
-
-| File | Tool | Purpose |
-|------|------|---------|
-| `CLAUDE.md` | Claude Code | Full project rules (source of truth) |
-| `AGENTS.md` | GitHub Copilot | Same rules in Copilot format |
-| `.cursorrules` | Cursor | Same rules in Cursor format |
-| `.github/copilot-instructions.md` | Copilot Cloud Agent | Condensed operational summary |
-
-### What the AI rules cover
-
-- **Five-phase workflow** — Understand → Plan → Implement → Verify → Commit
-- **Pipeline gates** — vet, build, test, lint must all pass before committing
-- **Architecture rules** — dependency direction, interface segregation, DI patterns
-- **Go coding standards** — naming, error handling, context, concurrency, logging
-- **Testing strategy** — table-driven tests, mockery mocks, TDD for complex logic
-- **Hard boundaries** — explicit "NEVER" rules that prevent common AI mistakes
-
-## CI/CD Pipeline
-
-`.github/workflows/ci.yml` runs on every push and pull request to `main`:
-
-| Stage | Command |
-|-------|---------|
-| Tidy check | `go mod tidy` + diff check |
-| Vet | `go vet ./...` |
-| Build | `go build ./...` |
-| Test | `go test -race -coverprofile=coverage.out ./...` |
-| Lint | `golangci-lint run` |
-
-## Customization
-
-- Edit `CLAUDE.md` to adjust rules, then sync to `AGENTS.md`, `.cursorrules`, and `.github/copilot-instructions.md`
-- Add your preferred libraries from the recommended list in the AI instructions
-- Extend the architecture sections to match your domain patterns
-- Adjust CI pipeline gates to add project-specific checks
 
 ## License
 
