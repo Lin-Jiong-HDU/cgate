@@ -4,3 +4,4 @@ data/
 *.md
 docs/
 runner-image/
+test/

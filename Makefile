@@ -1,4 +1,4 @@
-.PHONY: build test lint run tidy clean docker-build docker-build-runner docker-build-all docker-up docker-down
+.PHONY: build test lint run tidy clean docker-build docker-build-runner docker-build-all docker-up docker-down docker-test
 
 BINARY_NAME=cgate
 
@@ -33,3 +33,7 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+docker-test:
+	@bash test/docker/test-server-image.sh
+	@bash test/docker/test-runner-image.sh
