@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,6 +37,9 @@ func (r *taskRepository) GetByID(ctx context.Context, id string) (domain.Task, e
 	).Scan(&task.ID, &task.IssueNumber, &task.Title, &task.Body, &task.Author, &task.Repository, &task.HTMLURL, &task.Status, &task.ContainerID, &task.Log, &task.CreatedAt, &startedAt, &finishedAt)
 
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Task{}, domain.ErrNotFound
+		}
 		return task, fmt.Errorf("get task %s: %w", id, err)
 	}
 	if startedAt.Valid {

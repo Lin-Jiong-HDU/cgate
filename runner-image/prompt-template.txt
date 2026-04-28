@@ -1,11 +1,11 @@
-Process GitHub Issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
+Process GitHub Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
 
-Repository: {{REPOSITORY}}
-Branch: {{BRANCH}}
-Issue URL: {{ISSUE_URL}}
+Repository: ${REPOSITORY}
+Branch: ${branch}
+Issue URL: ${ISSUE_URL}
 
 Issue Description:
-{{ISSUE_BODY}}
+${ISSUE_BODY}
 
 Instructions:
 1. Read the CLAUDE.md file in the repository root and follow the 5-phase AI Workflow Protocol.

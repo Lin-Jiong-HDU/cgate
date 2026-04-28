@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -83,7 +84,7 @@ func Init() (*App, error) {
 		cfg.Docker.MaxConcurrency = 3
 	}
 	if cfg.Docker.Timeout == 0 {
-		cfg.Docker.Timeout = 30 * 1e9
+		cfg.Docker.Timeout = 30 * time.Minute
 	}
 	if cfg.Queue.MaxRetries == 0 {
 		cfg.Queue.MaxRetries = 1
@@ -113,7 +114,10 @@ func Init() (*App, error) {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	cgateURL := os.Getenv("CGATE_URL")
 
-	runner := docker.NewRunner(cfg.Docker, apiKey, cfg.GitHub.PAT, cgateURL)
+	runner, err := docker.NewRunner(cfg.Docker, apiKey, cfg.GitHub.PAT, cgateURL)
+	if err != nil {
+		return nil, fmt.Errorf("init docker runner: %w", err)
+	}
 	uc := usecase.NewTaskUsecase(taskRepo, taskQueue, runner, cfg.Docker)
 
 	mux := route.NewMux(uc, cfg.GitHub.WebhookSecret)

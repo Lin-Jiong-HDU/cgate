@@ -20,15 +20,18 @@ type runner struct {
 	cgateURL    string
 }
 
-func NewRunner(cfg domain.DockerConfig, apiKey, githubToken, cgateURL string) domain.DockerRunner {
-	cli, _ := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+func NewRunner(cfg domain.DockerConfig, apiKey, githubToken, cgateURL string) (domain.DockerRunner, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, fmt.Errorf("docker client init: %w", err)
+	}
 	return &runner{
 		cli:         cli,
 		cfg:         cfg,
 		apiKey:      apiKey,
 		githubToken: githubToken,
 		cgateURL:    cgateURL,
-	}
+	}, nil
 }
 
 func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, error) {
@@ -104,7 +107,7 @@ func (r *runner) ContainerLogs(ctx context.Context, containerID string) (<-chan 
 
 		pr, pw := io.Pipe()
 		go func() {
-			_, _ = stdcopy.StdCopy(pw, io.Discard, reader)
+			_, _ = stdcopy.StdCopy(pw, pw, reader)
 			_ = pw.Close()
 		}()
 

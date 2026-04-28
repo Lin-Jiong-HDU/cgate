@@ -51,6 +51,9 @@ func run() error {
 		return err
 	}
 
+	if err := app.Server.Shutdown(context.Background()); err != nil {
+		return err
+	}
 	app.UC.Stop()
-	return app.Server.Shutdown(context.Background())
+	return nil
 }

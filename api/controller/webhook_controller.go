@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -26,9 +27,8 @@ func (h *webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.usecase.HandleWebhook(r.Context(), payload)
 	if err != nil {
-		errMsg := err.Error()
-		if errMsg == "issue already has an active task" {
-			http.Error(w, errMsg, http.StatusConflict)
+		if errors.Is(err, domain.ErrActiveTaskExists) {
+			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 		slog.Error("handle webhook", "error", err)

@@ -16,9 +16,12 @@ func TestNewRunner_InvalidImage(t *testing.T) {
 		Timeout:        0,
 		SettingsPath:   "/dev/null",
 	}
-	r := docker.NewRunner(cfg, "fake-api-key", "fake-github-token", "http://localhost:8080")
+	r, err := docker.NewRunner(cfg, "fake-api-key", "fake-github-token", "http://localhost:8080")
+	if err != nil {
+		t.Fatalf("NewRunner returned error: %v", err)
+	}
 
-	_, err := r.StartContainer(context.Background(), domain.Task{
+	_, err = r.StartContainer(context.Background(), domain.Task{
 		ID:          "test-id",
 		IssueNumber: 1,
 		Title:       "test",
@@ -36,9 +39,12 @@ func TestNewRunner_StopNonexistent(t *testing.T) {
 		MaxConcurrency: 1,
 		SettingsPath:   "/dev/null",
 	}
-	r := docker.NewRunner(cfg, "", "", "")
+	r, err := docker.NewRunner(cfg, "", "", "")
+	if err != nil {
+		t.Fatalf("NewRunner returned error: %v", err)
+	}
 
-	err := r.StopContainer(context.Background(), "nonexistent-container-id")
+	err = r.StopContainer(context.Background(), "nonexistent-container-id")
 	if err == nil {
 		t.Error("expected error stopping nonexistent container")
 	}

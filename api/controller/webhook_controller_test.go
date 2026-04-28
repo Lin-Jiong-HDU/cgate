@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -97,7 +96,7 @@ func TestWebhookHandler_DuplicateIssue(t *testing.T) {
 	payload := domain.WebhookPayload{IssueNumber: 42, Title: "test", Repository: "owner/repo"}
 	body, _ := json.Marshal(payload)
 
-	uc.On("HandleWebhook", mock.Anything, payload).Return(domain.Task{}, fmt.Errorf("issue already has an active task"))
+	uc.On("HandleWebhook", mock.Anything, payload).Return(domain.Task{}, domain.ErrActiveTaskExists)
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook/github", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

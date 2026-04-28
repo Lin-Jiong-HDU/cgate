@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
@@ -36,7 +37,7 @@ func (u *taskUsecase) HandleWebhook(ctx context.Context, payload domain.WebhookP
 		return domain.Task{}, fmt.Errorf("check active tasks: %w", err)
 	}
 	if len(active) > 0 {
-		return domain.Task{}, fmt.Errorf("issue already has an active task")
+		return domain.Task{}, domain.ErrActiveTaskExists
 	}
 
 	task, err := domain.NewTask(payload)
@@ -142,23 +143,27 @@ func (u *taskUsecase) scheduleLoop(ctx context.Context) {
 			if !ok {
 				return
 			}
-			u.mu.Lock()
-			currentRunning := len(u.running)
-			u.mu.Unlock()
-
-			if currentRunning >= u.dockerCfg.MaxConcurrency {
-				u.queue.Enqueue(task)
-				continue
-			}
 
 			if u.runner == nil {
 				slog.Error("no docker runner configured")
 				continue
 			}
 
+			u.mu.Lock()
+			if len(u.running) >= u.dockerCfg.MaxConcurrency {
+				u.mu.Unlock()
+				u.queue.Enqueue(task)
+				continue
+			}
+			u.running[task.ID] = nil
+			u.mu.Unlock()
+
 			containerID, err := u.runner.StartContainer(ctx, task)
 			if err != nil {
 				slog.Error("start container", "task_id", task.ID, "error", err)
+				u.mu.Lock()
+				delete(u.running, task.ID)
+				u.mu.Unlock()
 				if updateErr := u.repo.UpdateFinished(ctx, task.ID, domain.TaskStatusFailed, err.Error()); updateErr != nil {
 					slog.Error("update failed status", "task_id", task.ID, "error", updateErr)
 				}
@@ -179,7 +184,9 @@ func (u *taskUsecase) scheduleLoop(ctx context.Context) {
 func (u *taskUsecase) watchContainer(ctx context.Context, task domain.Task) {
 	taskCtx, cancel := context.WithCancel(ctx)
 	u.mu.Lock()
-	u.running[task.ID] = cancel
+	if u.running[task.ID] == nil {
+		u.running[task.ID] = cancel
+	}
 	u.mu.Unlock()
 
 	defer func() {
@@ -194,18 +201,20 @@ func (u *taskUsecase) watchContainer(ctx context.Context, task domain.Task) {
 		slog.Error("get container logs", "task_id", task.ID, "error", err)
 	}
 
-	var logBuf string
-	for line := range logCh {
-		logBuf += line
-		if err := u.repo.AppendLog(taskCtx, task.ID, line); err != nil {
-			slog.Error("append log", "task_id", task.ID, "error", err)
+	var logBuf strings.Builder
+	if logCh != nil {
+		for line := range logCh {
+			logBuf.WriteString(line)
+			if err := u.repo.AppendLog(taskCtx, task.ID, line); err != nil {
+				slog.Error("append log", "task_id", task.ID, "error", err)
+			}
 		}
 	}
 
 	exitCode, err := u.runner.WaitContainer(taskCtx, task.ContainerID)
 	if err != nil {
 		slog.Error("wait container", "task_id", task.ID, "error", err)
-		if updateErr := u.repo.UpdateFinished(ctx, task.ID, domain.TaskStatusFailed, logBuf); updateErr != nil {
+		if updateErr := u.repo.UpdateFinished(ctx, task.ID, domain.TaskStatusFailed, logBuf.String()); updateErr != nil {
 			slog.Error("update failed status", "task_id", task.ID, "error", updateErr)
 		}
 		return
@@ -215,7 +224,7 @@ func (u *taskUsecase) watchContainer(ctx context.Context, task domain.Task) {
 	if exitCode != 0 {
 		status = domain.TaskStatusFailed
 	}
-	if err := u.repo.UpdateFinished(ctx, task.ID, status, logBuf); err != nil {
+	if err := u.repo.UpdateFinished(ctx, task.ID, status, logBuf.String()); err != nil {
 		slog.Error("update finished status", "task_id", task.ID, "error", err)
 	}
 	slog.Info("task completed", "task_id", task.ID, "status", status, "exit_code", exitCode)

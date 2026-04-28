@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -29,7 +30,12 @@ func NewTaskDetailHandler(uc domain.TaskUsecase) http.Handler {
 		id := r.PathValue("id")
 		task, err := uc.GetTask(r.Context(), id)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			if errors.Is(err, domain.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("get task", "error", err, "id", id)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -59,7 +65,12 @@ func NewTaskLogsHandler(uc domain.TaskUsecase) http.Handler {
 		id := r.PathValue("id")
 		logs, err := uc.GetTaskLogs(r.Context(), id)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			if errors.Is(err, domain.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("get task logs", "error", err, "id", id)
+			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

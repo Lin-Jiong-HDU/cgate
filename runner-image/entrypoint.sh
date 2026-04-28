@@ -17,6 +17,8 @@ clean_title=$(echo "$ISSUE_TITLE" | sed 's/\[claude bot\]//' | tr '[:upper:]' '[
 slug=$(echo "$clean_title" | cut -c1-40 | sed 's/-$//')
 branch="feat/issue-${ISSUE_NUMBER}-${slug}"
 
+export ISSUE_NUMBER ISSUE_TITLE ISSUE_BODY ISSUE_URL REPOSITORY branch
+
 git config --global user.name "$GIT_USER_NAME"
 git config --global user.email "$GIT_USER_EMAIL"
 git config --global credential.helper store
@@ -33,14 +35,7 @@ git checkout main
 git pull origin main
 git checkout -b "$branch"
 
-prompt=$(sed \
-    -e "s|{{ISSUE_NUMBER}}|${ISSUE_NUMBER}|g" \
-    -e "s|{{ISSUE_TITLE}}|${ISSUE_TITLE}|g" \
-    -e "s|{{ISSUE_URL}}|${ISSUE_URL}|g" \
-    -e "s|{{ISSUE_BODY}}|${ISSUE_BODY}|g" \
-    -e "s|{{REPOSITORY}}|${REPOSITORY}|g" \
-    -e "s|{{BRANCH}}|${branch}|g" \
-    /prompt-template.txt)
+prompt=$(envsubst < /prompt-template.txt)
 
 claude --max-turns "$MAX_TURNS" --prompt "$prompt"
 

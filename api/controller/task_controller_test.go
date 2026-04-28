@@ -2,7 +2,6 @@ package controller_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -71,7 +70,7 @@ func TestTaskDetailHandler_NotFound(t *testing.T) {
 	uc := new(mockUsecase)
 	handler := controller.NewTaskDetailHandler(uc)
 
-	uc.On("GetTask", mock.Anything, "nonexistent").Return(domain.Task{}, fmt.Errorf("not found"))
+	uc.On("GetTask", mock.Anything, "nonexistent").Return(domain.Task{}, domain.ErrNotFound)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/nonexistent", nil)
 	req.SetPathValue("id", "nonexistent")

@@ -9,16 +9,21 @@ import (
 type queue struct {
 	ch   chan domain.Task
 	once sync.Once
+	done chan struct{}
 }
 
 func New() domain.TaskQueue {
 	return &queue{
-		ch: make(chan domain.Task, 256),
+		ch:   make(chan domain.Task, 256),
+		done: make(chan struct{}),
 	}
 }
 
 func (q *queue) Enqueue(task domain.Task) {
-	q.ch <- task
+	select {
+	case q.ch <- task:
+	case <-q.done:
+	}
 }
 
 func (q *queue) Dequeue() <-chan domain.Task {
@@ -31,6 +36,7 @@ func (q *queue) Len() int {
 
 func (q *queue) Close() {
 	q.once.Do(func() {
+		close(q.done)
 		close(q.ch)
 	})
 }
