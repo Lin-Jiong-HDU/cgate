@@ -7,9 +7,11 @@ import (
 )
 
 type queue struct {
-	ch   chan domain.Task
-	once sync.Once
-	done chan struct{}
+	ch     chan domain.Task
+	once   sync.Once
+	done   chan struct{}
+	closed bool
+	mu     sync.RWMutex
 }
 
 func New() domain.TaskQueue {
@@ -20,6 +22,12 @@ func New() domain.TaskQueue {
 }
 
 func (q *queue) Enqueue(task domain.Task) {
+	q.mu.RLock()
+	if q.closed {
+		q.mu.RUnlock()
+		return
+	}
+	defer q.mu.RUnlock()
 	select {
 	case q.ch <- task:
 	case <-q.done:
@@ -36,6 +44,9 @@ func (q *queue) Len() int {
 
 func (q *queue) Close() {
 	q.once.Do(func() {
+		q.mu.Lock()
+		q.closed = true
+		q.mu.Unlock()
 		close(q.done)
 		close(q.ch)
 	})

@@ -213,6 +213,9 @@ func (u *taskUsecase) watchContainer(ctx context.Context, task domain.Task) {
 
 	exitCode, err := u.runner.WaitContainer(taskCtx, task.ContainerID)
 	if err != nil {
+		if taskCtx.Err() != nil {
+			return
+		}
 		slog.Error("wait container", "task_id", task.ID, "error", err)
 		if updateErr := u.repo.UpdateFinished(ctx, task.ID, domain.TaskStatusFailed, logBuf.String()); updateErr != nil {
 			slog.Error("update failed status", "task_id", task.ID, "error", updateErr)

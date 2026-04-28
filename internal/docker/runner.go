@@ -115,7 +115,11 @@ func (r *runner) ContainerLogs(ctx context.Context, containerID string) (<-chan 
 		for {
 			n, err := pr.Read(buf)
 			if n > 0 {
-				ch <- string(buf[:n])
+				select {
+				case ch <- string(buf[:n]):
+				case <-ctx.Done():
+					return
+				}
 			}
 			if err != nil {
 				return
