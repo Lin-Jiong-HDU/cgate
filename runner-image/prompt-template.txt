@@ -1,0 +1,15 @@
+Process GitHub Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
+
+Repository: ${REPOSITORY}
+Branch: ${branch}
+Issue URL: ${ISSUE_URL}
+
+Issue Description:
+${ISSUE_BODY}
+
+Instructions:
+1. Read the CLAUDE.md file in the repository root and follow the 5-phase AI Workflow Protocol.
+2. Implement the changes described in the issue.
+3. Run all pipeline gates: go vet, go build, go test, golangci-lint run.
+4. Commit your changes using Conventional Commits format.
+5. Push your branch when done. A PR will be created automatically.

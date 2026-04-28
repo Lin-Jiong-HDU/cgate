@@ -1,0 +1,6 @@
+bin/
+data/
+.git/
+*.md
+docs/
+runner-image/
