@@ -2,8 +2,11 @@ package docker
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
 	"github.com/docker/docker/api/types/container"
@@ -46,7 +49,7 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		fmt.Sprintf("ISSUE_URL=%s", task.HTMLURL),
 		fmt.Sprintf("GIT_USER_NAME=%s", r.cfg.GitUserName),
 		fmt.Sprintf("GIT_USER_EMAIL=%s", r.cfg.GitUserEmail),
-		fmt.Sprintf("MAX_TURNS=%d", 15),
+		fmt.Sprintf("MAX_TURNS=%d", r.cfg.MaxTurns),
 	}
 
 	mounts := []mount.Mount{
@@ -57,13 +60,36 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		},
 	}
 
-	if r.cfg.SettingsPath != "" {
+	switch r.cfg.PermissionMode {
+	case "permissive":
+		permissiveSettings := map[string]any{
+			"permissions": map[string]any{
+				"allow": []string{"Bash(*)", "Read(*)", "Write(*)", "Edit(*)"},
+			},
+		}
+		data, err := json.Marshal(permissiveSettings)
+		if err != nil {
+			return "", fmt.Errorf("marshal permissive settings: %w", err)
+		}
+		tmpFile := fmt.Sprintf("/tmp/cgate/settings/%s.json", task.ID)
+		if err := writeTmpFile(tmpFile, data); err != nil {
+			return "", fmt.Errorf("write permissive settings: %w", err)
+		}
 		mounts = append(mounts, mount.Mount{
 			Type:     mount.TypeBind,
-			Source:   r.cfg.SettingsPath,
+			Source:   tmpFile,
 			Target:   "/root/.claude/settings.json",
 			ReadOnly: true,
 		})
+	default:
+		if r.cfg.SettingsPath != "" {
+			mounts = append(mounts, mount.Mount{
+				Type:     mount.TypeBind,
+				Source:   r.cfg.SettingsPath,
+				Target:   "/root/.claude/settings.json",
+				ReadOnly: true,
+			})
+		}
 	}
 
 	resp, err := r.cli.ContainerCreate(ctx, &container.Config{
@@ -146,4 +172,11 @@ func (r *runner) IsRunning(ctx context.Context, containerID string) (bool, error
 		return false, err
 	}
 	return inspect.State.Running, nil
+}
+
+func writeTmpFile(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }

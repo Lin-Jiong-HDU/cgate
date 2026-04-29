@@ -14,6 +14,8 @@ func TestNewRunner_InvalidImage(t *testing.T) {
 		Image:          "nonexistent-image-that-does-not-exist:latest",
 		MaxConcurrency: 1,
 		Timeout:        0,
+		MaxTurns:       15,
+		PermissionMode: "strict",
 		SettingsPath:   "/dev/null",
 	}
 	r, err := docker.NewRunner(cfg, "fake-api-key", "fake-github-token", "http://localhost:8080")
@@ -37,6 +39,8 @@ func TestNewRunner_StopNonexistent(t *testing.T) {
 	cfg := domain.DockerConfig{
 		Image:          "alpine:latest",
 		MaxConcurrency: 1,
+		MaxTurns:       15,
+		PermissionMode: "strict",
 		SettingsPath:   "/dev/null",
 	}
 	r, err := docker.NewRunner(cfg, "", "", "")

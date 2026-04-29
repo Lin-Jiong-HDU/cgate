@@ -17,7 +17,9 @@ type DockerConfig struct {
 	Image          string
 	MaxConcurrency int
 	Timeout        time.Duration
+	MaxTurns       int
 	SettingsPath   string
+	PermissionMode string // "strict" uses settings_path, "permissive" allows all operations
 	GitUserName    string
 	GitUserEmail   string
 }
