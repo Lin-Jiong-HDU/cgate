@@ -21,6 +21,9 @@ go.work.sum
 .env.*
 !.env.example
 
+# Config
+config.yaml
+
 # IDE
 .idea/
 .vscode/

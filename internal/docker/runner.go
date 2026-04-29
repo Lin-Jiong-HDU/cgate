@@ -46,7 +46,7 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		fmt.Sprintf("ISSUE_URL=%s", task.HTMLURL),
 		fmt.Sprintf("GIT_USER_NAME=%s", r.cfg.GitUserName),
 		fmt.Sprintf("GIT_USER_EMAIL=%s", r.cfg.GitUserEmail),
-		fmt.Sprintf("MAX_TURNS=%d", 15),
+		fmt.Sprintf("MAX_TURNS=%d", r.cfg.MaxTurns),
 	}
 
 	mounts := []mount.Mount{
@@ -57,7 +57,9 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		},
 	}
 
-	if r.cfg.SettingsPath != "" {
+	if r.cfg.PermissionMode == "permissive" {
+		env = append(env, "SKIP_PERMISSIONS=true")
+	} else if r.cfg.SettingsPath != "" {
 		mounts = append(mounts, mount.Mount{
 			Type:     mount.TypeBind,
 			Source:   r.cfg.SettingsPath,

@@ -60,7 +60,9 @@ func Init() (*App, error) {
 			Image:          viper.GetString("docker.image"),
 			MaxConcurrency: viper.GetInt("docker.max_concurrency"),
 			Timeout:        viper.GetDuration("docker.timeout"),
+			MaxTurns:       viper.GetInt("docker.max_turns"),
 			SettingsPath:   viper.GetString("docker.settings_path"),
+			PermissionMode: viper.GetString("docker.permission_mode"),
 			GitUserName:    viper.GetString("docker.git_user_name"),
 			GitUserEmail:   viper.GetString("docker.git_user_email"),
 		},
@@ -85,6 +87,12 @@ func Init() (*App, error) {
 	}
 	if cfg.Docker.Timeout == 0 {
 		cfg.Docker.Timeout = 30 * time.Minute
+	}
+	if cfg.Docker.MaxTurns == 0 {
+		cfg.Docker.MaxTurns = 15
+	}
+	if cfg.Docker.PermissionMode == "" {
+		cfg.Docker.PermissionMode = "strict"
 	}
 	if cfg.Queue.MaxRetries == 0 {
 		cfg.Queue.MaxRetries = 1

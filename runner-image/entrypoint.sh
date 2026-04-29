@@ -37,7 +37,12 @@ git checkout -b "$branch"
 
 prompt=$(envsubst < /prompt-template.txt)
 
-claude --max-turns "$MAX_TURNS" --prompt "$prompt"
+claude_args=(--max-turns "$MAX_TURNS" --prompt "$prompt")
+if [ "${SKIP_PERMISSIONS:-}" = "true" ]; then
+    claude_args+=(--dangerously-skip-permissions)
+fi
+
+claude "${claude_args[@]}"
 
 git push -u origin "$branch"
 
