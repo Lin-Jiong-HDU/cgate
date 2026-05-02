@@ -70,7 +70,7 @@ Automated implementation by CGate.
 Changes:
 \$(git log --oneline main..HEAD)" \\
     --base main \\
-    --head "${branch}"
+    --head "${branch}" || echo "PR already exists or creation skipped"
 SCRIPT
     chmod +x /tmp/run-claude.sh
     chown runner:runner /tmp/run-claude.sh
@@ -90,5 +90,5 @@ Automated implementation by CGate.
 Changes:
 $(git log --oneline main..HEAD)" \
         --base main \
-        --head "$branch"
+        --head "$branch" || echo "PR already exists or creation skipped"
 fi
