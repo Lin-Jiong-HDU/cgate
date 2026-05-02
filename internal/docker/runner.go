@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-
 	"os"
+	"strings"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
 	"github.com/docker/docker/api/types/container"
@@ -84,13 +84,22 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		})
 	}
 
+	for _, key := range []string{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"} {
+		if v := os.Getenv(key); v != "" {
+			v = strings.Replace(v, "127.0.0.1", "host.docker.internal", 1)
+			v = strings.Replace(v, "localhost", "host.docker.internal", 1)
+			env = append(env, fmt.Sprintf("%s=%s", key, v))
+		}
+	}
+
 	resp, err := r.cli.ContainerCreate(ctx, &container.Config{
 		Image: r.cfg.Image,
 		Env:   env,
 		Cmd:   []string{"/entrypoint.sh"},
 		Tty:   false,
 	}, &container.HostConfig{
-		Mounts: mounts,
+		Mounts:     mounts,
+		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 	}, nil, nil, fmt.Sprintf("cgate-%s", task.ID))
 	if err != nil {
 		return "", fmt.Errorf("create container: %w", err)

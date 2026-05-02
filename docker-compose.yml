@@ -18,4 +18,8 @@ services:
       - CGATE_URL=${CGATE_URL}
       - GIT_USER_NAME=${GIT_USER_NAME:-cgate-bot}
       - GIT_USER_EMAIL=${GIT_USER_EMAIL:-cgate-bot@users.noreply.github.com}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
