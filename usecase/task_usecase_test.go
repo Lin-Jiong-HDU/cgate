@@ -208,13 +208,16 @@ func TestWatchContainer_CleansUpOnSuccess(t *testing.T) {
 	q := queue.New()
 	defer q.Close()
 
+	cleanupCh := make(chan struct{})
 	runner.On("StartContainer", mock.Anything, mock.AnythingOfType("domain.Task")).Return("c2", nil)
 	repo.On("List", mock.Anything, domain.TaskStatusPending).Return([]domain.Task{}, nil)
 	repo.On("List", mock.Anything, domain.TaskStatusRunning).Return([]domain.Task{}, nil)
 	repo.On("UpdateStatus", mock.Anything, mock.AnythingOfType("string"), domain.TaskStatusRunning, "c2").Return(nil)
 	runner.On("ContainerLogs", mock.Anything, "c2").Return(nil, nil)
 	runner.On("WaitContainer", mock.Anything, "c2").Return(0, nil)
-	runner.On("CleanupTask", mock.Anything, mock.AnythingOfType("string"), "c2").Return(nil)
+	runner.On("CleanupTask", mock.Anything, mock.AnythingOfType("string"), "c2").Return(nil).Run(func(_ mock.Arguments) {
+		close(cleanupCh)
+	})
 	repo.On("UpdateFinished", mock.Anything, mock.AnythingOfType("string"), domain.TaskStatusSucceeded, mock.Anything).Return(nil)
 	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 99).Return([]domain.Task{}, nil)
 	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
@@ -230,15 +233,9 @@ func TestWatchContainer_CleansUpOnSuccess(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Eventually(t, func() bool {
-		called := false
-		for _, call := range runner.Calls {
-			if call.Method == "CleanupTask" {
-				called = true
-				break
-			}
-		}
-		return called
-	}, 2*time.Second, 50*time.Millisecond)
-	runner.AssertCalled(t, "CleanupTask", mock.Anything, mock.AnythingOfType("string"), "c2")
+	select {
+	case <-cleanupCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("CleanupTask was not called within timeout")
+	}
 }
