@@ -47,6 +47,12 @@ func Init() (*App, error) {
 	if err := viper.BindEnv("docker.git_user_email", "GIT_USER_EMAIL"); err != nil {
 		slog.Warn("bind env", "error", err)
 	}
+	if err := viper.BindEnv("docker.base_url", "ANTHROPIC_BASE_URL"); err != nil {
+		slog.Warn("bind env", "error", err)
+	}
+	if err := viper.BindEnv("docker.model", "ANTHROPIC_MODEL"); err != nil {
+		slog.Warn("bind env", "error", err)
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		slog.Warn("no config file found, using defaults and env vars")
@@ -65,6 +71,8 @@ func Init() (*App, error) {
 			PermissionMode: viper.GetString("docker.permission_mode"),
 			GitUserName:    viper.GetString("docker.git_user_name"),
 			GitUserEmail:   viper.GetString("docker.git_user_email"),
+			BaseURL:        viper.GetString("docker.base_url"),
+			Model:          viper.GetString("docker.model"),
 		},
 		Queue: domain.QueueConfig{
 			MaxRetries: viper.GetInt("queue.max_retries"),
@@ -121,10 +129,8 @@ func Init() (*App, error) {
 	taskQueue := queue.New()
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	cgateURL := os.Getenv("CGATE_URL")
-	baseURL := os.Getenv("ANTHROPIC_BASE_URL")
-	model := os.Getenv("ANTHROPIC_MODEL")
 
-	runner, err := docker.NewRunner(cfg.Docker, apiKey, cfg.GitHub.PAT, cgateURL, baseURL, model)
+	runner, err := docker.NewRunner(cfg.Docker, apiKey, cfg.GitHub.PAT, cgateURL, cfg.Docker.BaseURL, cfg.Docker.Model)
 	if err != nil {
 		return nil, fmt.Errorf("init docker runner: %w", err)
 	}

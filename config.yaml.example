@@ -10,6 +10,8 @@ docker:
   settings_path: "./settings.json"
   git_user_name: "cgate-bot"
   git_user_email: "cgate-bot@users.noreply.github.com"
+  base_url: ""    # Anthropic API base URL, e.g. https://open.bigmodel.cn/api/anthropic
+  model: ""       # Model name, e.g. glm-5.1
 
 github:
   webhook_secret: "${GITHUB_WEBHOOK_SECRET}"

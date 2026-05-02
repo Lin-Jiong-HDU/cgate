@@ -22,6 +22,8 @@ type DockerConfig struct {
 	PermissionMode string // "strict" uses settings_path, "permissive" allows all operations
 	GitUserName    string
 	GitUserEmail   string
+	BaseURL        string
+	Model          string
 }
 
 type QueueConfig struct {
