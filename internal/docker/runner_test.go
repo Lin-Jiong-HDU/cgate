@@ -53,3 +53,31 @@ func TestNewRunner_StopNonexistent(t *testing.T) {
 		t.Error("expected error stopping nonexistent container")
 	}
 }
+
+func TestCleanupTask_NonexistentContainer_NoError(t *testing.T) {
+	t.Parallel()
+	cfg := domain.DockerConfig{Image: "alpine:latest", MaxTurns: 15}
+	r, err := docker.NewRunner(cfg, "", "", "", "", "")
+	if err != nil {
+		t.Fatalf("NewRunner returned error: %v", err)
+	}
+
+	err = r.CleanupTask(context.Background(), "nonexistent-task", "nonexistent-container")
+	if err != nil {
+		t.Errorf("CleanupTask should not fail for missing container: %v", err)
+	}
+}
+
+func TestCleanupTask_EmptyContainerID_NoError(t *testing.T) {
+	t.Parallel()
+	cfg := domain.DockerConfig{Image: "alpine:latest", MaxTurns: 15}
+	r, err := docker.NewRunner(cfg, "", "", "", "", "")
+	if err != nil {
+		t.Fatalf("NewRunner returned error: %v", err)
+	}
+
+	err = r.CleanupTask(context.Background(), "some-task-id", "")
+	if err != nil {
+		t.Errorf("CleanupTask should not fail with empty containerID: %v", err)
+	}
+}

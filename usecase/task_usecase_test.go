@@ -3,12 +3,14 @@ package usecase_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
 	"github.com/Lin-Jiong-HDU/go-project-template/internal/queue"
 	"github.com/Lin-Jiong-HDU/go-project-template/usecase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // --- Mock Repository ---
@@ -61,6 +63,10 @@ func (m *mockRunner) StartContainer(ctx context.Context, task domain.Task) (stri
 
 func (m *mockRunner) StopContainer(ctx context.Context, containerID string) error {
 	return m.Called(ctx, containerID).Error(0)
+}
+
+func (m *mockRunner) CleanupTask(ctx context.Context, taskID string, containerID string) error {
+	return m.Called(ctx, taskID, containerID).Error(0)
 }
 
 func (m *mockRunner) ContainerLogs(ctx context.Context, containerID string) (<-chan string, error) {
@@ -176,6 +182,7 @@ func TestCancelTask_StopsRunningContainer(t *testing.T) {
 	err := uc.CancelTask(context.Background(), "t1")
 	assert.NoError(t, err)
 	runner.AssertCalled(t, "StopContainer", mock.Anything, "c1")
+	runner.AssertNotCalled(t, "CleanupTask", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestCancelTask_PendingTask_MarksCancelled(t *testing.T) {
@@ -192,4 +199,43 @@ func TestCancelTask_PendingTask_MarksCancelled(t *testing.T) {
 	err := uc.CancelTask(context.Background(), "t1")
 	assert.NoError(t, err)
 	repo.AssertCalled(t, "UpdateFinished", mock.Anything, "t1", domain.TaskStatusCancelled, "cancelled")
+}
+
+func TestWatchContainer_CleansUpOnSuccess(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	runner := new(mockRunner)
+	q := queue.New()
+	defer q.Close()
+
+	cleanupCh := make(chan struct{})
+	runner.On("StartContainer", mock.Anything, mock.AnythingOfType("domain.Task")).Return("c2", nil)
+	repo.On("List", mock.Anything, domain.TaskStatusPending).Return([]domain.Task{}, nil)
+	repo.On("List", mock.Anything, domain.TaskStatusRunning).Return([]domain.Task{}, nil)
+	repo.On("UpdateStatus", mock.Anything, mock.AnythingOfType("string"), domain.TaskStatusRunning, "c2").Return(nil)
+	runner.On("ContainerLogs", mock.Anything, "c2").Return(nil, nil)
+	runner.On("WaitContainer", mock.Anything, "c2").Return(0, nil)
+	runner.On("CleanupTask", mock.Anything, mock.AnythingOfType("string"), "c2").Return(nil).Run(func(_ mock.Arguments) {
+		close(cleanupCh)
+	})
+	repo.On("UpdateFinished", mock.Anything, mock.AnythingOfType("string"), domain.TaskStatusSucceeded, mock.Anything).Return(nil)
+	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 99).Return([]domain.Task{}, nil)
+	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
+
+	uc := usecase.NewTaskUsecase(repo, q, runner, domain.DockerConfig{MaxConcurrency: 1})
+	require.NoError(t, uc.Start(context.Background()))
+	defer uc.Stop()
+
+	_, err := uc.HandleWebhook(context.Background(), domain.WebhookPayload{
+		IssueNumber: 99,
+		Title:       "test [claude bot]",
+		Repository:  "owner/repo",
+	})
+	require.NoError(t, err)
+
+	select {
+	case <-cleanupCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("CleanupTask was not called within timeout")
+	}
 }

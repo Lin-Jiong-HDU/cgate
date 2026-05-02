@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
@@ -115,6 +117,21 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 
 func (r *runner) StopContainer(ctx context.Context, containerID string) error {
 	return r.cli.ContainerStop(ctx, containerID, container.StopOptions{})
+}
+
+func (r *runner) CleanupTask(ctx context.Context, taskID string, containerID string) error {
+	if containerID != "" {
+		if err := r.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true}); err != nil {
+			if !errdefs.IsNotFound(err) {
+				slog.Warn("failed to remove container", "task_id", taskID, "error", err)
+			}
+		}
+	}
+	repoDir := fmt.Sprintf("/tmp/cgate/repos/%s", taskID)
+	if err := os.RemoveAll(repoDir); err != nil {
+		slog.Warn("failed to remove workspace", "task_id", taskID, "path", repoDir, "error", err)
+	}
+	return nil
 }
 
 func (r *runner) ContainerLogs(ctx context.Context, containerID string) (<-chan string, error) {
