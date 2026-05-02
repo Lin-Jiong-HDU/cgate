@@ -15,6 +15,7 @@ type TaskUsecase interface {
 type DockerRunner interface {
 	StartContainer(ctx context.Context, task Task) (containerID string, err error)
 	StopContainer(ctx context.Context, containerID string) error
+	CleanupTask(ctx context.Context, taskID string, containerID string) error
 	ContainerLogs(ctx context.Context, containerID string) (<-chan string, error)
 	WaitContainer(ctx context.Context, containerID string) (exitCode int, err error)
 	IsRunning(ctx context.Context, containerID string) (bool, error)

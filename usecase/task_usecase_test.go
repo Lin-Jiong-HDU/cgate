@@ -63,6 +63,10 @@ func (m *mockRunner) StopContainer(ctx context.Context, containerID string) erro
 	return m.Called(ctx, containerID).Error(0)
 }
 
+func (m *mockRunner) CleanupTask(ctx context.Context, taskID string, containerID string) error {
+	return m.Called(ctx, taskID, containerID).Error(0)
+}
+
 func (m *mockRunner) ContainerLogs(ctx context.Context, containerID string) (<-chan string, error) {
 	args := m.Called(ctx, containerID)
 	if args.Get(0) == nil {
@@ -170,6 +174,7 @@ func TestCancelTask_StopsRunningContainer(t *testing.T) {
 	task := domain.Task{ID: "t1", Status: domain.TaskStatusRunning, ContainerID: "c1"}
 	repo.On("GetByID", mock.Anything, "t1").Return(task, nil)
 	runner.On("StopContainer", mock.Anything, "c1").Return(nil)
+	runner.On("CleanupTask", mock.Anything, "t1", "c1").Return(nil)
 	repo.On("UpdateFinished", mock.Anything, "t1", domain.TaskStatusCancelled, "cancelled").Return(nil)
 
 	uc := usecase.NewTaskUsecase(repo, q, runner, domain.DockerConfig{MaxConcurrency: 1})
