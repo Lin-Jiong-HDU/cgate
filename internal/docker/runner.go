@@ -59,11 +59,7 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		env = append(env, fmt.Sprintf("ANTHROPIC_BASE_URL=%s", r.baseURL))
 	}
 	if r.model != "" {
-		env = append(env,
-			fmt.Sprintf("ANTHROPIC_DEFAULT_HAIKU_MODEL=%s", r.model),
-			fmt.Sprintf("ANTHROPIC_DEFAULT_OPUS_MODEL=%s", r.model),
-			fmt.Sprintf("ANTHROPIC_DEFAULT_SONNET_MODEL=%s", r.model),
-		)
+		env = append(env, fmt.Sprintf("ANTHROPIC_MODEL=%s", r.model))
 	}
 
 	repoDir := fmt.Sprintf("/tmp/cgate/repos/%s", task.ID)
