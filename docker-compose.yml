@@ -2,15 +2,19 @@ services:
   cgate:
     build: .
     ports:
-      - "8080:8080"
+      - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/cgate/repos:/tmp/cgate/repos
+      - ./config.yaml:/app/config.yaml:ro
       - ./settings.json:/app/settings.json:ro
       - ./data:/app/data
     environment:
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - GITHUB_PAT=${GITHUB_PAT}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
       - CGATE_URL=${CGATE_URL}
       - GIT_USER_NAME=${GIT_USER_NAME:-cgate-bot}
       - GIT_USER_EMAIL=${GIT_USER_EMAIL:-cgate-bot@users.noreply.github.com}

@@ -121,8 +121,10 @@ func Init() (*App, error) {
 	taskQueue := queue.New()
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	cgateURL := os.Getenv("CGATE_URL")
+	baseURL := os.Getenv("ANTHROPIC_BASE_URL")
+	model := os.Getenv("ANTHROPIC_MODEL")
 
-	runner, err := docker.NewRunner(cfg.Docker, apiKey, cfg.GitHub.PAT, cgateURL)
+	runner, err := docker.NewRunner(cfg.Docker, apiKey, cfg.GitHub.PAT, cgateURL, baseURL, model)
 	if err != nil {
 		return nil, fmt.Errorf("init docker runner: %w", err)
 	}

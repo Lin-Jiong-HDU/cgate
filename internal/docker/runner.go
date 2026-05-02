@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"os"
+
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -18,9 +20,11 @@ type runner struct {
 	apiKey      string
 	githubToken string
 	cgateURL    string
+	baseURL     string
+	model       string
 }
 
-func NewRunner(cfg domain.DockerConfig, apiKey, githubToken, cgateURL string) (domain.DockerRunner, error) {
+func NewRunner(cfg domain.DockerConfig, apiKey, githubToken, cgateURL, baseURL, model string) (domain.DockerRunner, error) {
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return nil, fmt.Errorf("docker client init: %w", err)
@@ -31,6 +35,8 @@ func NewRunner(cfg domain.DockerConfig, apiKey, githubToken, cgateURL string) (d
 		apiKey:      apiKey,
 		githubToken: githubToken,
 		cgateURL:    cgateURL,
+		baseURL:     baseURL,
+		model:       model,
 	}, nil
 }
 
@@ -48,6 +54,20 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		fmt.Sprintf("GIT_USER_EMAIL=%s", r.cfg.GitUserEmail),
 		fmt.Sprintf("MAX_TURNS=%d", r.cfg.MaxTurns),
 	}
+
+	if r.baseURL != "" {
+		env = append(env, fmt.Sprintf("ANTHROPIC_BASE_URL=%s", r.baseURL))
+	}
+	if r.model != "" {
+		env = append(env,
+			fmt.Sprintf("ANTHROPIC_DEFAULT_HAIKU_MODEL=%s", r.model),
+			fmt.Sprintf("ANTHROPIC_DEFAULT_OPUS_MODEL=%s", r.model),
+			fmt.Sprintf("ANTHROPIC_DEFAULT_SONNET_MODEL=%s", r.model),
+		)
+	}
+
+	repoDir := fmt.Sprintf("/tmp/cgate/repos/%s", task.ID)
+	_ = os.MkdirAll(repoDir, 0755)
 
 	mounts := []mount.Mount{
 		{

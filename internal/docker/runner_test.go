@@ -18,7 +18,7 @@ func TestNewRunner_InvalidImage(t *testing.T) {
 		PermissionMode: "strict",
 		SettingsPath:   "/dev/null",
 	}
-	r, err := docker.NewRunner(cfg, "fake-api-key", "fake-github-token", "http://localhost:8080")
+	r, err := docker.NewRunner(cfg, "fake-api-key", "fake-github-token", "http://localhost:8080", "", "")
 	if err != nil {
 		t.Fatalf("NewRunner returned error: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestNewRunner_StopNonexistent(t *testing.T) {
 		PermissionMode: "strict",
 		SettingsPath:   "/dev/null",
 	}
-	r, err := docker.NewRunner(cfg, "", "", "")
+	r, err := docker.NewRunner(cfg, "", "", "", "", "")
 	if err != nil {
 		t.Fatalf("NewRunner returned error: %v", err)
 	}
