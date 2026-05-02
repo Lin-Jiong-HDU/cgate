@@ -71,9 +71,6 @@ func (u *taskUsecase) CancelTask(ctx context.Context, id string) error {
 		if err := u.runner.StopContainer(ctx, task.ContainerID); err != nil {
 			slog.Warn("failed to stop container", "container_id", task.ContainerID, "error", err)
 		}
-		if err := u.runner.CleanupTask(ctx, task.ID, task.ContainerID); err != nil {
-			slog.Warn("cleanup task", "task_id", task.ID, "error", err)
-		}
 	}
 
 	u.mu.Lock()
@@ -167,6 +164,9 @@ func (u *taskUsecase) scheduleLoop(ctx context.Context) {
 				u.mu.Lock()
 				delete(u.running, task.ID)
 				u.mu.Unlock()
+				if cleanupErr := u.runner.CleanupTask(ctx, task.ID, ""); cleanupErr != nil {
+					slog.Warn("cleanup task", "task_id", task.ID, "error", cleanupErr)
+				}
 				if updateErr := u.repo.UpdateFinished(ctx, task.ID, domain.TaskStatusFailed, err.Error()); updateErr != nil {
 					slog.Error("update failed status", "task_id", task.ID, "error", updateErr)
 				}
@@ -197,6 +197,9 @@ func (u *taskUsecase) watchContainer(ctx context.Context, task domain.Task) {
 		u.mu.Lock()
 		delete(u.running, task.ID)
 		u.mu.Unlock()
+		if err := u.runner.CleanupTask(ctx, task.ID, task.ContainerID); err != nil {
+			slog.Warn("cleanup task", "task_id", task.ID, "error", err)
+		}
 	}()
 
 	logCh, err := u.runner.ContainerLogs(taskCtx, task.ContainerID)
@@ -234,7 +237,4 @@ func (u *taskUsecase) watchContainer(ctx context.Context, task domain.Task) {
 		slog.Error("update finished status", "task_id", task.ID, "error", err)
 	}
 	slog.Info("task completed", "task_id", task.ID, "status", status, "exit_code", exitCode)
-	if err := u.runner.CleanupTask(ctx, task.ID, task.ContainerID); err != nil {
-		slog.Warn("cleanup task", "task_id", task.ID, "error", err)
-	}
 }
