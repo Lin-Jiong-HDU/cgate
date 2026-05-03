@@ -12,5 +12,5 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates docker-cli
 COPY --from=builder /cgate /usr/local/bin/cgate
 
-EXPOSE 8080
+EXPOSE 8000
 ENTRYPOINT ["cgate"]
