@@ -11,12 +11,14 @@ GitHub Issue [... claude bot]
       → Scheduler launches an isolated Docker container
         → Container clones repo, runs Claude Code
           → Claude implements, tests, commits, opens a PR
+            → Container and workspace are cleaned up
 ```
 
 ## Features
 
 - **Issue-driven automation** — open a GitHub issue, get a PR
 - **Docker-isolated execution** — each task runs in its own container
+- **Auto-cleanup** — containers and workspace directories are removed after task completion
 - **Concurrency control** — configurable max parallel tasks (default: 3)
 - **Task lifecycle** — pending → running → succeeded / failed / cancelled
 - **REST API** — list, inspect, cancel, and read logs for tasks
@@ -27,54 +29,160 @@ GitHub Issue [... claude bot]
 
 ### Prerequisites
 
-- Go 1.24+
-- Docker
-- GitHub PAT with repo permissions
-- Anthropic API key
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- GitHub Personal Access Token with `repo` scope
+- Anthropic API key (or compatible endpoint)
 
-### 1. Build
+### Step 1: Clone and Build Images
 
 ```bash
+git clone https://github.com/Lin-Jiong-HDU/cgate.git
+cd cgate
 make docker-build-all
 ```
 
-This builds both the server image and the runner image (`claude-code-runner`).
+This builds two images:
+- **`cgate`** — the server (from the project root `Dockerfile`)
+- **`claude-code-runner`** — the ephemeral task runner (from `runner-image/Dockerfile`), which includes Go, Node.js, Claude Code CLI, and GitHub CLI
 
-### 2. Configure
+> **Note:** The runner image is large (~2 GB) because it includes the full Go toolchain, Node.js, and Claude Code. The first build takes several minutes.
 
-Copy `config.yaml` and adjust as needed:
+### Step 2: Create Configuration
+
+Copy the example config and adjust:
+
+```bash
+cp config.yaml.example config.yaml
+```
 
 ```yaml
 server:
-  port: 8080
+  port: 8000          # Must match the port in docker-compose.yml
 
 docker:
-  runner_image: claude-code-runner:latest
-  max_concurrency: 3
+  image: "claude-code-runner:latest"
+  max_concurrency: 3  # Max parallel runner containers
+  timeout: "30m"      # Container execution timeout
+  max_turns: 15       # Max Claude Code conversation turns
+  permission_mode: "permissive"  # "permissive" or "strict"
+  settings_path: "./settings.json"
+  git_user_name: "cgate-bot"
+  git_user_email: "cgate-bot@users.noreply.github.com"
+  base_url: ""        # Optional: Anthropic API base URL (e.g. https://open.bigmodel.cn/api/anthropic)
+  model: ""           # Optional: Model name (e.g. glm-5.1)
 
-database:
-  path: ./data/cgate.db
+github:
+  webhook_secret: "${GITHUB_WEBHOOK_SECRET}"  # From .env
+  pat: "${GITHUB_PAT}"                         # From .env
+
+queue:
+  max_retries: 1      # Retry failed tasks once before giving up
 ```
 
-### 3. Run
+> **Important:** Set `server.port` to `8000` to match the `docker-compose.yml` port mapping (`8000:8000`).
+
+### Step 3: Create `.env`
+
+Create a `.env` file in the project root (this file is gitignored):
+
+```bash
+# Required
+GITHUB_WEBHOOK_SECRET=<your-webhook-secret>    # Arbitrary secret, shared with target repo's Actions secrets
+GITHUB_PAT=<your-github-pat>                    # GitHub PAT with repo scope
+ANTHROPIC_API_KEY=<your-api-key>                # Anthropic API key
+CGATE_URL=http://your-server-ip:8000            # Public URL where this server is reachable
+
+# Optional — for non-Anthropic API endpoints
+ANTHROPIC_BASE_URL=
+ANTHROPIC_MODEL=
+
+# Optional — proxy settings (forwarded to runner containers)
+HTTP_PROXY=
+HTTPS_PROXY=
+
+# Optional — git identity overrides
+GIT_USER_NAME=cgate-bot
+GIT_USER_EMAIL=cgate-bot@users.noreply.github.com
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_WEBHOOK_SECRET` | Yes | Secret for webhook authentication (shared with target repo) |
+| `GITHUB_PAT` | Yes | GitHub PAT with `repo` scope, injected into runner containers |
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key, injected into runner containers |
+| `CGATE_URL` | Yes | Public URL of this CGate instance (used by runner containers) |
+| `ANTHROPIC_BASE_URL` | No | Alternative API base URL (e.g. `https://open.bigmodel.cn/api/anthropic`) |
+| `ANTHROPIC_MODEL` | No | Model name override (e.g. `glm-5.1`) |
+| `HTTP_PROXY` | No | HTTP proxy, forwarded to runner containers |
+| `HTTPS_PROXY` | No | HTTPS proxy, forwarded to runner containers |
+| `GIT_USER_NAME` | No | Git commit author name (default: `cgate-bot`) |
+| `GIT_USER_EMAIL` | No | Git commit author email (default: `cgate-bot@users.noreply.github.com`) |
+
+### Step 4: Create `settings.json` (strict mode only)
+
+If `permission_mode` is set to `"strict"`, create a `settings.json` in the project root defining which tools Claude Code is allowed to use:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Read",
+      "Write"
+    ],
+    "deny": []
+  }
+}
+```
+
+If `permission_mode` is `"permissive"`, this file is not required — Claude Code runs with all permissions enabled.
+
+### Step 5: Launch
 
 ```bash
 docker compose up -d
 ```
 
-Set the following environment variables (via `docker-compose.yml` or `.env`):
+Verify the server is running:
 
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_WEBHOOK_SECRET` | Secret for webhook authentication |
-| `GITHUB_PAT` | GitHub personal access token (injected into runner containers) |
-| `ANTHROPIC_API_KEY` | Anthropic API key (injected into runner containers) |
+```bash
+docker logs cgate-cgate-1
+# Expected output:
+#   INFO scheduler started max_concurrency=3
+#   INFO server starting addr=:8000
+```
 
-### 4. Set up the GitHub webhook
+Test the API:
 
-In your target repository, configure a GitHub Actions workflow that POSTs issue data to CGate. See `.github/workflows/issue-webhook.yml` for a ready-made workflow.
+```bash
+curl http://localhost:8000/api/tasks
+```
 
-Alternatively, use the manual trigger workflow (`.github/workflows/claude.yml`) from the Actions tab.
+### Step 6: Set up GitHub Webhook
+
+CGate uses a GitHub Actions workflow to forward issue events from your **target repository** (the repo you want Claude to work on) to the CGate server.
+
+1. Copy `.github/workflows/issue-webhook.yml` from this repo into your target repository at `.github/workflows/issue-webhook.yml`.
+
+2. Add the following **repository secrets** in your target repo (Settings → Secrets and variables → Actions):
+
+   | Secret | Value |
+   |--------|-------|
+   | `WEBHOOK_URL` | Your CGate server URL (e.g. `http://your-server-ip:8000/webhook/github`) |
+   | `WEBHOOK_SECRET` | The same value as `GITHUB_WEBHOOK_SECRET` in your `.env` |
+
+3. Create an issue in the target repo with a title ending in `[claude bot]`:
+
+   ```
+   Add user authentication [claude bot]
+   ```
+
+   The issue body should contain the requirements and acceptance criteria. CGate will pick it up, run Claude Code in an isolated container, and open a pull request.
 
 ## API
 
@@ -120,7 +228,9 @@ make build              # Build binary
 make run                # Run locally
 make test               # Run tests with coverage
 make lint               # Run golangci-lint
-make docker-test        # Run Docker image integration tests
+make docker-build-all   # Build both server and runner Docker images
+make docker-up          # Start via docker compose
+make docker-down        # Stop via docker compose
 ```
 
 ## License
