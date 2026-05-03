@@ -8,6 +8,56 @@ import (
 	"github.com/Lin-Jiong-HDU/go-project-template/internal/docker"
 )
 
+func TestSanitizeEnvValue_RemovesControlChars(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"removes null bytes", "hello\x00world", "helloworld"},
+		{"removes control chars", "test\x01\x02\x03value", "testvalue"},
+		{"keeps newlines", "line1\nline2", "line1\nline2"},
+		{"keeps tabs", "col1\tcol2", "col1\tcol2"},
+		{"keeps carriage returns", "line1\r\nline2", "line1\r\nline2"},
+		{"empty string", "", ""},
+		{"clean string", "hello world", "hello world"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := docker.SanitizeEnvValue(tt.input)
+			if got != tt.expected {
+				t.Errorf("SanitizeEnvValue(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSanitizeShellValue_StripsCommandSubstitution(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"strips dollar paren", "$(rm -rf /)", "rm -rf /)"},
+		{"strips backticks", "`cat /etc/passwd`", "cat /etc/passwd"},
+		{"strips both", "$(whoami)`id`", "whoami)id"},
+		{"clean title", "Fix bug [claude bot]", "Fix bug [claude bot]"},
+		{"nested command", "$(echo $(secret))", "echo secret))"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := docker.SanitizeShellValue(tt.input)
+			if got != tt.expected {
+				t.Errorf("SanitizeShellValue(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
 func TestNewRunner_InvalidImage(t *testing.T) {
 	t.Parallel()
 	cfg := domain.DockerConfig{

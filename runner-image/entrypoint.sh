@@ -50,26 +50,27 @@ if [ "$(id -u)" = "0" ]; then
     chown -R runner:runner /home/runner /workspace /tmp/prompt.txt
 
     # Write a launcher script that includes git push + PR creation
-    cat > /tmp/run-claude.sh <<SCRIPT
+    export branch
+    cat > /tmp/run-claude.sh <<'SCRIPT'
 #!/bin/bash
 cd /workspace/repo
 git config --global --add safe.directory /workspace/repo
-claude -p "\$(cat /tmp/prompt.txt)" --dangerously-skip-permissions
+claude -p "$(cat /tmp/prompt.txt)" --dangerously-skip-permissions
 
 echo "=== Pushing branch ==="
-for i in 1 2 3 4 5; do git push -u origin ${branch} && break || sleep 10; done
+for i in 1 2 3 4 5; do git push -u origin "${branch}" && break || sleep 10; done
 
 echo "=== Creating PR ==="
-pr_title=\$(echo "${ISSUE_TITLE}" | sed 's/[[:space:]]*\[claude bot\]//')
-gh pr create \\
-    --title "\$pr_title" \\
+pr_title=$(echo "${ISSUE_TITLE}" | sed 's/[[:space:]]*\[claude bot\]//')
+gh pr create \
+    --title "$pr_title" \
     --body "Closes #${ISSUE_NUMBER}
 
 Automated implementation by CGate.
 
 Changes:
-\$(git log --oneline main..HEAD)" \\
-    --base main \\
+$(git log --oneline main..HEAD)" \
+    --base main \
     --head "${branch}" || echo "PR already exists or creation skipped"
 SCRIPT
     chmod +x /tmp/run-claude.sh

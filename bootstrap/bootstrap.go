@@ -78,8 +78,9 @@ func Init() (*App, error) {
 			MaxRetries: viper.GetInt("queue.max_retries"),
 		},
 		GitHub: domain.GitHubConfig{
-			WebhookSecret: viper.GetString("github.webhook_secret"),
-			PAT:           viper.GetString("github.pat"),
+			WebhookSecret:  viper.GetString("github.webhook_secret"),
+			PAT:            viper.GetString("github.pat"),
+			AllowedAuthors: viper.GetStringSlice("github.allowed_authors"),
 		},
 	}
 
@@ -134,7 +135,7 @@ func Init() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("init docker runner: %w", err)
 	}
-	uc := usecase.NewTaskUsecase(taskRepo, taskQueue, runner, cfg.Docker)
+	uc := usecase.NewTaskUsecase(taskRepo, taskQueue, runner, cfg.Docker, cfg.GitHub.AllowedAuthors)
 
 	mux := route.NewMux(uc, cfg.GitHub.WebhookSecret)
 

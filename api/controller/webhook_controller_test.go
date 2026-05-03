@@ -106,3 +106,22 @@ func TestWebhookHandler_DuplicateIssue(t *testing.T) {
 
 	assert.Equal(t, http.StatusConflict, rec.Code)
 }
+
+func TestWebhookHandler_UnauthorizedAuthor(t *testing.T) {
+	t.Parallel()
+	uc := new(mockUsecase)
+	handler := controller.NewWebhookHandler(uc)
+
+	payload := domain.WebhookPayload{IssueNumber: 42, Title: "test", Repository: "owner/repo", Author: "attacker"}
+	body, _ := json.Marshal(payload)
+
+	uc.On("HandleWebhook", mock.Anything, payload).Return(domain.Task{}, domain.ErrUnauthorized)
+
+	req := httptest.NewRequest(http.MethodPost, "/webhook/github", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
