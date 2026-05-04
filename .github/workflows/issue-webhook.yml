@@ -9,8 +9,10 @@ permissions:
 
 jobs:
   notify:
-    # Only trigger when issue title ends with [claude bot]
-    if: endsWith(github.event.issue.title, '[claude bot]')
+    # Only trigger when issue title ends with [claude bot] and author is a collaborator
+    if: >-
+      endsWith(github.event.issue.title, '[claude bot]') &&
+      contains(fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'), github.event.issue.author_association)
     runs-on: ubuntu-latest
 
     steps:

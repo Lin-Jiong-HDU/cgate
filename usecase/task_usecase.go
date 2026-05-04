@@ -11,27 +11,42 @@ import (
 )
 
 type taskUsecase struct {
-	repo      domain.TaskRepository
-	queue     domain.TaskQueue
-	runner    domain.DockerRunner
-	dockerCfg domain.DockerConfig
+	repo           domain.TaskRepository
+	queue          domain.TaskQueue
+	runner         domain.DockerRunner
+	dockerCfg      domain.DockerConfig
+	allowedAuthors []string
 
 	running   map[string]context.CancelFunc
 	mu        sync.Mutex
 	cancelCtx context.CancelFunc
 }
 
-func NewTaskUsecase(repo domain.TaskRepository, queue domain.TaskQueue, runner domain.DockerRunner, dockerCfg domain.DockerConfig) domain.TaskUsecase {
+func NewTaskUsecase(repo domain.TaskRepository, queue domain.TaskQueue, runner domain.DockerRunner, dockerCfg domain.DockerConfig, allowedAuthors []string) domain.TaskUsecase {
 	return &taskUsecase{
-		repo:      repo,
-		queue:     queue,
-		runner:    runner,
-		dockerCfg: dockerCfg,
-		running:   make(map[string]context.CancelFunc),
+		repo:           repo,
+		queue:          queue,
+		runner:         runner,
+		dockerCfg:      dockerCfg,
+		allowedAuthors: allowedAuthors,
+		running:        make(map[string]context.CancelFunc),
 	}
 }
 
 func (u *taskUsecase) HandleWebhook(ctx context.Context, payload domain.WebhookPayload) (domain.Task, error) {
+	if len(u.allowedAuthors) > 0 {
+		allowed := false
+		for _, a := range u.allowedAuthors {
+			if a == payload.Author {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return domain.Task{}, domain.ErrUnauthorized
+		}
+	}
+
 	active, err := u.repo.FindActiveByIssue(ctx, payload.Repository, payload.IssueNumber)
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("check active tasks: %w", err)

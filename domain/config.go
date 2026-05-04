@@ -31,6 +31,7 @@ type QueueConfig struct {
 }
 
 type GitHubConfig struct {
-	PAT           string
-	WebhookSecret string
+	PAT             string
+	WebhookSecret   string
+	AllowedAuthors  []string
 }

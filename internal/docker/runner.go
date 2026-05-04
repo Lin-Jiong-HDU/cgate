@@ -47,11 +47,11 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		fmt.Sprintf("ANTHROPIC_API_KEY=%s", r.apiKey),
 		fmt.Sprintf("GITHUB_TOKEN=%s", r.githubToken),
 		fmt.Sprintf("CGATE_URL=%s", r.cgateURL),
-		fmt.Sprintf("REPOSITORY=%s", task.Repository),
+		fmt.Sprintf("REPOSITORY=%s", SanitizeEnvValue(task.Repository)),
 		fmt.Sprintf("ISSUE_NUMBER=%d", task.IssueNumber),
-		fmt.Sprintf("ISSUE_TITLE=%s", task.Title),
-		fmt.Sprintf("ISSUE_BODY=%s", task.Body),
-		fmt.Sprintf("ISSUE_URL=%s", task.HTMLURL),
+		fmt.Sprintf("ISSUE_TITLE=%s", SanitizeShellValue(task.Title)),
+		fmt.Sprintf("ISSUE_BODY=%s", SanitizeEnvValue(task.Body)),
+		fmt.Sprintf("ISSUE_URL=%s", SanitizeEnvValue(task.HTMLURL)),
 		fmt.Sprintf("GIT_USER_NAME=%s", r.cfg.GitUserName),
 		fmt.Sprintf("GIT_USER_EMAIL=%s", r.cfg.GitUserEmail),
 		fmt.Sprintf("MAX_TURNS=%d", r.cfg.MaxTurns),
@@ -190,4 +190,27 @@ func (r *runner) IsRunning(ctx context.Context, containerID string) (bool, error
 		return false, err
 	}
 	return inspect.State.Running, nil
+}
+
+// SanitizeEnvValue removes null bytes and control characters from environment
+// variable values to prevent injection in downstream shell scripts.
+func SanitizeEnvValue(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r >= 0x20 || r == '\t' || r == '\n' || r == '\r' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// SanitizeShellValue strips shell command substitution patterns in addition to
+// control characters. Used for fields that flow into shell scripts where
+// expansion could occur (e.g., issue titles used in heredocs).
+func SanitizeShellValue(s string) string {
+	s = SanitizeEnvValue(s)
+	s = strings.ReplaceAll(s, "$(", "")
+	s = strings.ReplaceAll(s, "`", "")
+	return s
 }

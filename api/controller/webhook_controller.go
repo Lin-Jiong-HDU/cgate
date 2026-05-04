@@ -31,6 +31,10 @@ func (h *webhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
+		if errors.Is(err, domain.ErrUnauthorized) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
 		slog.Error("handle webhook", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

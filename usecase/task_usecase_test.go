@@ -100,7 +100,7 @@ func TestHandleWebhook_CreatesAndEnqueues(t *testing.T) {
 	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 42).Return([]domain.Task{}, nil)
 	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	payload := domain.WebhookPayload{
 		IssueNumber: 42,
 		Title:       "Add feature [claude bot]",
@@ -125,7 +125,7 @@ func TestHandleWebhook_RejectsDuplicateActive(t *testing.T) {
 	existing := domain.Task{ID: "existing", Status: domain.TaskStatusRunning}
 	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 42).Return([]domain.Task{existing}, nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	payload := domain.WebhookPayload{
 		IssueNumber: 42,
 		Title:       "Add feature",
@@ -145,7 +145,7 @@ func TestGetTask_ReturnsTask(t *testing.T) {
 	expected := domain.Task{ID: "task-1", Title: "test"}
 	repo.On("GetByID", mock.Anything, "task-1").Return(expected, nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	got, err := uc.GetTask(context.Background(), "task-1")
 	assert.NoError(t, err)
 	assert.Equal(t, "task-1", got.ID)
@@ -160,7 +160,7 @@ func TestListTasks_DelegatesToRepo(t *testing.T) {
 	tasks := []domain.Task{{ID: "1"}, {ID: "2"}}
 	repo.On("List", mock.Anything, domain.TaskStatusPending).Return(tasks, nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	got, err := uc.ListTasks(context.Background(), domain.TaskStatusPending)
 	assert.NoError(t, err)
 	assert.Len(t, got, 2)
@@ -178,7 +178,7 @@ func TestCancelTask_StopsRunningContainer(t *testing.T) {
 	runner.On("StopContainer", mock.Anything, "c1").Return(nil)
 	repo.On("UpdateFinished", mock.Anything, "t1", domain.TaskStatusCancelled, "cancelled").Return(nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, runner, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, runner, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	err := uc.CancelTask(context.Background(), "t1")
 	assert.NoError(t, err)
 	runner.AssertCalled(t, "StopContainer", mock.Anything, "c1")
@@ -195,7 +195,7 @@ func TestCancelTask_PendingTask_MarksCancelled(t *testing.T) {
 	repo.On("GetByID", mock.Anything, "t1").Return(task, nil)
 	repo.On("UpdateFinished", mock.Anything, "t1", domain.TaskStatusCancelled, "cancelled").Return(nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	err := uc.CancelTask(context.Background(), "t1")
 	assert.NoError(t, err)
 	repo.AssertCalled(t, "UpdateFinished", mock.Anything, "t1", domain.TaskStatusCancelled, "cancelled")
@@ -222,7 +222,7 @@ func TestWatchContainer_CleansUpOnSuccess(t *testing.T) {
 	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 99).Return([]domain.Task{}, nil)
 	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
 
-	uc := usecase.NewTaskUsecase(repo, q, runner, domain.DockerConfig{MaxConcurrency: 1})
+	uc := usecase.NewTaskUsecase(repo, q, runner, domain.DockerConfig{MaxConcurrency: 1}, nil)
 	require.NoError(t, uc.Start(context.Background()))
 	defer uc.Stop()
 
@@ -238,4 +238,72 @@ func TestWatchContainer_CleansUpOnSuccess(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("CleanupTask was not called within timeout")
 	}
+}
+
+func TestHandleWebhook_RejectsUnauthorizedAuthor(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	allowedAuthors := []string{"trusted-user", "admin"}
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, allowedAuthors)
+	payload := domain.WebhookPayload{
+		IssueNumber: 42,
+		Title:       "Add feature [claude bot]",
+		Repository:  "owner/repo",
+		Author:      "random-attacker",
+		URL:         "https://github.com/owner/repo/issues/42",
+	}
+
+	_, err := uc.HandleWebhook(context.Background(), payload)
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+}
+
+func TestHandleWebhook_AllowsAuthorizedAuthor(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	allowedAuthors := []string{"trusted-user", "admin"}
+	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 42).Return([]domain.Task{}, nil)
+	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, allowedAuthors)
+	payload := domain.WebhookPayload{
+		IssueNumber: 42,
+		Title:       "Add feature [claude bot]",
+		Repository:  "owner/repo",
+		Author:      "trusted-user",
+		URL:         "https://github.com/owner/repo/issues/42",
+	}
+
+	task, err := uc.HandleWebhook(context.Background(), payload)
+	assert.NoError(t, err)
+	assert.Equal(t, domain.TaskStatusPending, task.Status)
+}
+
+func TestHandleWebhook_EmptyAllowlist_AllowsAll(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	repo.On("FindActiveByIssue", mock.Anything, "owner/repo", 42).Return([]domain.Task{}, nil)
+	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
+	payload := domain.WebhookPayload{
+		IssueNumber: 42,
+		Title:       "Add feature [claude bot]",
+		Repository:  "owner/repo",
+		Author:      "anyone",
+		URL:         "https://github.com/owner/repo/issues/42",
+	}
+
+	task, err := uc.HandleWebhook(context.Background(), payload)
+	assert.NoError(t, err)
+	assert.Equal(t, domain.TaskStatusPending, task.Status)
 }
