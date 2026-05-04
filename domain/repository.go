@@ -10,4 +10,5 @@ type TaskRepository interface {
 	AppendLog(ctx context.Context, id string, log string) error
 	UpdateFinished(ctx context.Context, id string, status TaskStatus, log string) error
 	FindActiveByIssue(ctx context.Context, repository string, issueNumber int) ([]Task, error)
+	FindActiveByPR(ctx context.Context, repository string, prNumber int) ([]Task, error)
 }

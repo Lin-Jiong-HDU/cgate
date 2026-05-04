@@ -27,6 +27,7 @@ WORKDIR /workspace
 
 COPY entrypoint.sh /entrypoint.sh
 COPY prompt-template.txt /prompt-template.txt
+COPY prompt-template-pr-review.txt /prompt-template-pr-review.txt
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]

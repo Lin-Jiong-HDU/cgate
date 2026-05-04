@@ -1,0 +1,27 @@
+PR Review Auto-Fix for PR #${PR_NUMBER}
+
+Repository: ${REPOSITORY}
+Branch: ${pr_branch}
+
+You are an automated code review fixer. Read the review comments from /workspace/reviews.json and apply fixes.
+
+Instructions:
+
+1. Read /workspace/reviews.json to get all review data.
+2. **You MUST follow all coding standards and workflow protocols in the project root CLAUDE.md.**
+3. For each review comment:
+   - Judge whether it is a valid code issue (bug, security flaw, logic error, missing error handling, test gap).
+   - Ignore pure style preferences, subjective opinions, and nitpicks that don't affect correctness.
+   - Only fix comments that genuinely need changes.
+4. For each fix:
+   - Make the minimal change that addresses the review comment.
+   - Commit with message format: fix(review): address review comment on <filename>
+   - Each fix gets an independent commit.
+5. Do NOT modify code unrelated to reviews.
+6. After all fixes, run the pipeline gates in order:
+   - go vet ./...
+   - go build ./...
+   - go test ./...
+   - golangci-lint run
+7. If any gate fails, follow the Debug Protocol in CLAUDE.md to fix the issue before proceeding.
+8. Do NOT create a new branch or PR. Push fixes directly to the current branch.
