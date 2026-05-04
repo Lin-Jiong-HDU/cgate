@@ -1,9 +1,9 @@
 package queue_test
 
 import (
-	"runtime"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/Lin-Jiong-HDU/go-project-template/domain"
 	"github.com/Lin-Jiong-HDU/go-project-template/internal/queue"
@@ -28,11 +28,13 @@ func TestQueue_DequeueBlocksWhenEmpty(t *testing.T) {
 	q := queue.New()
 	defer q.Close()
 
+	done := make(chan struct{})
 	var received atomic.Int32
 	go func() {
 		got := <-q.Dequeue()
 		_ = got
 		received.Store(1)
+		close(done)
 	}()
 
 	if received.Load() == 1 {
@@ -40,11 +42,10 @@ func TestQueue_DequeueBlocksWhenEmpty(t *testing.T) {
 	}
 
 	q.Enqueue(domain.Task{ID: "unblock"})
-	for i := 0; i < 100; i++ {
-		runtime.Gosched()
-		if received.Load() == 1 {
-			break
-		}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected Dequeue to unblock after Enqueue")
 	}
 	if received.Load() != 1 {
 		t.Error("expected Dequeue to unblock after Enqueue")
