@@ -55,7 +55,11 @@ if [ "$(id -u)" = "0" ]; then
 #!/bin/bash
 cd /workspace/repo
 git config --global --add safe.directory /workspace/repo
-claude -p "$(cat /tmp/prompt.txt)" --dangerously-skip-permissions
+claude_args=(-p "$(cat /tmp/prompt.txt)")
+if [ "${SKIP_PERMISSIONS:-}" = "true" ]; then
+    claude_args+=(--dangerously-skip-permissions)
+fi
+claude "${claude_args[@]}"
 
 echo "=== Pushing branch ==="
 for i in 1 2 3 4 5; do git push -u origin "${branch}" && break || sleep 10; done

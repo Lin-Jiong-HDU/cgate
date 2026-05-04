@@ -16,6 +16,7 @@ docker:
 github:
   webhook_secret: "${GITHUB_WEBHOOK_SECRET}"
   pat: "${GITHUB_PAT}"
+  allowed_authors: []  # Optional author allowlist, e.g. ["user1", "user2"]; empty = allow all
 
 queue:
   max_retries: 1

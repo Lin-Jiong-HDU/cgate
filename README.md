@@ -74,6 +74,7 @@ docker:
 github:
   webhook_secret: "${GITHUB_WEBHOOK_SECRET}"  # From .env
   pat: "${GITHUB_PAT}"                         # From .env
+  allowed_authors: []                          # Optional: restrict to specific GitHub usernames (e.g. ["user1", "user2"]); empty = allow all
 
 queue:
   max_retries: 1      # Retry failed tasks once before giving up
