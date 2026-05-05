@@ -38,7 +38,7 @@ run_issue() {
     for i in 1 2 3; do git pull origin main && break || sleep 5; done
     git checkout -b "$branch"
 
-    envsubst < /prompt-template.txt > /tmp/prompt.txt
+    envsubst '${ISSUE_NUMBER} ${ISSUE_TITLE} ${ISSUE_BODY} ${REPOSITORY} ${ISSUE_URL} ${branch}' < /prompt-template.txt > /tmp/prompt.txt
 
     claude_args=(-p "$(cat /tmp/prompt.txt)")
     if [ "${SKIP_PERMISSIONS:-}" = "true" ]; then
@@ -137,7 +137,7 @@ run_pr_review() {
 }
 REVIEWEOF
 
-    envsubst < /prompt-template-pr-review.txt > /tmp/prompt.txt
+    envsubst '${PR_NUMBER} ${REPOSITORY} ${pr_branch}' < /prompt-template-pr-review.txt > /tmp/prompt.txt
 
     claude_args=(-p "$(cat /tmp/prompt.txt)")
     if [ "${SKIP_PERMISSIONS:-}" = "true" ]; then
