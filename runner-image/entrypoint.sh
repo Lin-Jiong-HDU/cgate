@@ -25,12 +25,6 @@ repo_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.git"
 for i in 1 2 3 4 5; do git clone "$repo_url" /workspace/repo && break || (rm -rf /workspace/repo && sleep 10); done
 cd /workspace/repo
 
-if [ "$TASK_TYPE" = "pr_review" ]; then
-    run_pr_review
-else
-    run_issue
-fi
-
 # --- Issue flow (original) ---
 run_issue() {
     : "${ISSUE_NUMBER:?ISSUE_NUMBER is required}"
@@ -125,14 +119,13 @@ run_pr_review() {
     git checkout "$pr_branch"
     for i in 1 2 3; do git pull origin "$pr_branch" && break || sleep 5; done
 
-    # Fetch all reviews
-    reviews_json=$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" 2>/dev/null || echo '[]')
+    # Fetch reviews: only CHANGES_REQUESTED and COMMENTED states, ignore PENDING and APPROVED
+    reviews_json=$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
+        --jq '[.[] | select(.state == "CHANGES_REQUESTED" or .state == "COMMENTED")]' 2>/dev/null || echo '[]')
 
-    # Fetch all inline review comments
+    # Fetch all inline review comments (unresolved filtering is delegated to Claude at runtime)
     comments_json=$(gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}/comments" 2>/dev/null || echo '[]')
 
-    # Filter reviews: only CHANGES_REQUESTED and COMMENT types, ignore PENDING and APPROVED
-    # Filter comments: only unresolved ones
     # Build combined review data
     cat > /workspace/reviews.json <<REVIEWEOF
 {
@@ -182,3 +175,10 @@ SCRIPT
         for i in 1 2 3 4 5; do git push origin "$pr_branch" && break || sleep 10; done
     fi
 }
+
+# --- Dispatch ---
+if [ "$TASK_TYPE" = "pr_review" ]; then
+    run_pr_review
+else
+    run_issue
+fi

@@ -55,25 +55,29 @@ func migrate(db *sql.DB) error {
 }
 
 func migrateV2(db *sql.DB) error {
-	exists, err := columnExists(db, "tasks", "task_type")
-	if err != nil {
-		return err
+	type columnMigration struct {
+		table  string
+		column string
+		alter  string
 	}
-	if exists {
-		return nil
+	migrations := []columnMigration{
+		{"tasks", "task_type", "ALTER TABLE tasks ADD COLUMN task_type TEXT NOT NULL DEFAULT 'issue'"},
+		{"tasks", "pr_number", "ALTER TABLE tasks ADD COLUMN pr_number INTEGER DEFAULT 0"},
+		{"tasks", "comment_id", "ALTER TABLE tasks ADD COLUMN comment_id INTEGER DEFAULT 0"},
 	}
-
-	alters := []string{
-		"ALTER TABLE tasks ADD COLUMN task_type TEXT NOT NULL DEFAULT 'issue'",
-		"ALTER TABLE tasks ADD COLUMN pr_number INTEGER DEFAULT 0",
-		"ALTER TABLE tasks ADD COLUMN comment_id INTEGER DEFAULT 0",
-	}
-	for _, stmt := range alters {
-		if _, err := db.Exec(stmt); err != nil {
+	for _, m := range migrations {
+		exists, err := columnExists(db, m.table, m.column)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		if _, err := db.Exec(m.alter); err != nil {
 			return err
 		}
 	}
-	_, err = db.Exec("CREATE INDEX IF NOT EXISTS idx_tasks_repo_pr_type ON tasks(repository, pr_number, task_type)")
+	_, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_tasks_repo_pr_type ON tasks(repository, pr_number, task_type)")
 	return err
 }
 
