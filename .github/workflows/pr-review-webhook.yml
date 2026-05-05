@@ -1,0 +1,37 @@
+name: PR Review Webhook
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: read
+  issues: read
+
+jobs:
+  notify:
+    # Only trigger on PR comments starting with /claude fix-review and author has write access
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/claude fix-review') &&
+      contains(fromJSON('["OWNER", "COLLABORATOR", "MEMBER"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send PR review to webhook
+        run: |
+          curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
+            -d '{
+                "action": "created",
+                "trigger_type": "pr_review",
+                "pr_number": ${{ github.event.issue.number }},
+                "comment_id": ${{ github.event.comment.id }},
+                "title": ${{ toJson(github.event.issue.title) }},
+                "body": ${{ toJson(github.event.comment.body) }},
+                "author": "${{ github.event.comment.user.login }}",
+                "url": "${{ github.event.issue.html_url }}",
+                "repository": "${{ github.repository }}",
+                "created_at": "${{ github.event.comment.created_at }}"
+              }'

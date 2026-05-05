@@ -20,9 +20,9 @@ func NewTaskRepository(db *sql.DB) domain.TaskRepository {
 
 func (r *taskRepository) Create(ctx context.Context, task domain.Task) error {
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO tasks (id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		task.ID, task.IssueNumber, task.Title, task.Body, task.Author, task.Repository, task.HTMLURL, task.Status, task.ContainerID, task.Log, task.CreatedAt, task.StartedAt, task.FinishedAt,
+		`INSERT INTO tasks (id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at, task_type, pr_number, comment_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		task.ID, task.IssueNumber, task.Title, task.Body, task.Author, task.Repository, task.HTMLURL, task.Status, task.ContainerID, task.Log, task.CreatedAt, task.StartedAt, task.FinishedAt, task.TaskType, task.PRNumber, task.CommentID,
 	)
 	return err
 }
@@ -32,9 +32,9 @@ func (r *taskRepository) GetByID(ctx context.Context, id string) (domain.Task, e
 	var startedAt, finishedAt sql.NullTime
 
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at
+		`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at, task_type, pr_number, comment_id
 		 FROM tasks WHERE id = ?`, id,
-	).Scan(&task.ID, &task.IssueNumber, &task.Title, &task.Body, &task.Author, &task.Repository, &task.HTMLURL, &task.Status, &task.ContainerID, &task.Log, &task.CreatedAt, &startedAt, &finishedAt)
+	).Scan(&task.ID, &task.IssueNumber, &task.Title, &task.Body, &task.Author, &task.Repository, &task.HTMLURL, &task.Status, &task.ContainerID, &task.Log, &task.CreatedAt, &startedAt, &finishedAt, &task.TaskType, &task.PRNumber, &task.CommentID)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -57,11 +57,11 @@ func (r *taskRepository) List(ctx context.Context, status domain.TaskStatus) ([]
 
 	if status == "" {
 		rows, err = r.db.QueryContext(ctx,
-			`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at
+			`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at, task_type, pr_number, comment_id
 			 FROM tasks ORDER BY created_at DESC`)
 	} else {
 		rows, err = r.db.QueryContext(ctx,
-			`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at
+			`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at, task_type, pr_number, comment_id
 			 FROM tasks WHERE status = ? ORDER BY created_at DESC`, status)
 	}
 	if err != nil {
@@ -102,9 +102,22 @@ func (r *taskRepository) UpdateFinished(ctx context.Context, id string, status d
 
 func (r *taskRepository) FindActiveByIssue(ctx context.Context, repository string, issueNumber int) ([]domain.Task, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at
+		`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at, task_type, pr_number, comment_id
 		 FROM tasks WHERE repository = ? AND issue_number = ? AND status IN ('pending', 'running')`,
 		repository, issueNumber)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanTasks(rows)
+}
+
+func (r *taskRepository) FindActiveByPR(ctx context.Context, repository string, prNumber int) ([]domain.Task, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, issue_number, title, body, author, repository, html_url, status, container_id, log, created_at, started_at, finished_at, task_type, pr_number, comment_id
+		 FROM tasks WHERE repository = ? AND pr_number = ? AND task_type = 'pr_review' AND status IN ('pending', 'running')`,
+		repository, prNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +131,7 @@ func scanTasks(rows *sql.Rows) ([]domain.Task, error) {
 	for rows.Next() {
 		var task domain.Task
 		var startedAt, finishedAt sql.NullTime
-		err := rows.Scan(&task.ID, &task.IssueNumber, &task.Title, &task.Body, &task.Author, &task.Repository, &task.HTMLURL, &task.Status, &task.ContainerID, &task.Log, &task.CreatedAt, &startedAt, &finishedAt)
+		err := rows.Scan(&task.ID, &task.IssueNumber, &task.Title, &task.Body, &task.Author, &task.Repository, &task.HTMLURL, &task.Status, &task.ContainerID, &task.Log, &task.CreatedAt, &startedAt, &finishedAt, &task.TaskType, &task.PRNumber, &task.CommentID)
 		if err != nil {
 			return nil, err
 		}

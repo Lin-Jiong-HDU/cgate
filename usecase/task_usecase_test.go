@@ -50,6 +50,11 @@ func (m *mockRepo) FindActiveByIssue(ctx context.Context, repository string, iss
 	return args.Get(0).([]domain.Task), args.Error(1)
 }
 
+func (m *mockRepo) FindActiveByPR(ctx context.Context, repository string, prNumber int) ([]domain.Task, error) {
+	args := m.Called(ctx, repository, prNumber)
+	return args.Get(0).([]domain.Task), args.Error(1)
+}
+
 // --- Mock DockerRunner ---
 
 type mockRunner struct {
@@ -113,7 +118,58 @@ func TestHandleWebhook_CreatesAndEnqueues(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, domain.TaskStatusPending, task.Status)
 	assert.Equal(t, 42, task.IssueNumber)
+	assert.Equal(t, domain.TaskTypeIssue, task.TaskType)
 	repo.AssertCalled(t, "Create", mock.Anything, mock.AnythingOfType("domain.Task"))
+}
+
+func TestHandleWebhook_PRReview_CreatesAndEnqueues(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	repo.On("FindActiveByPR", mock.Anything, "owner/repo", 55).Return([]domain.Task{}, nil)
+	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
+	payload := domain.WebhookPayload{
+		TriggerType: "pr_review",
+		PRNumber:    55,
+		CommentID:   12345,
+		Title:       "Fix the bug",
+		Repository:  "owner/repo",
+		Author:      "reviewer",
+		URL:         "https://github.com/owner/repo/pull/55",
+	}
+
+	task, err := uc.HandleWebhook(context.Background(), payload)
+	assert.NoError(t, err)
+	assert.Equal(t, domain.TaskStatusPending, task.Status)
+	assert.Equal(t, domain.TaskTypePRReview, task.TaskType)
+	assert.Equal(t, 55, task.PRNumber)
+	assert.Equal(t, int64(12345), task.CommentID)
+	repo.AssertCalled(t, "Create", mock.Anything, mock.AnythingOfType("domain.Task"))
+}
+
+func TestHandleWebhook_PRReview_RejectsDuplicateActive(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	existing := domain.Task{ID: "existing", Status: domain.TaskStatusRunning, TaskType: domain.TaskTypePRReview}
+	repo.On("FindActiveByPR", mock.Anything, "owner/repo", 55).Return([]domain.Task{existing}, nil)
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
+	payload := domain.WebhookPayload{
+		TriggerType: "pr_review",
+		PRNumber:    55,
+		Title:       "Fix review",
+		Repository:  "owner/repo",
+	}
+
+	_, err := uc.HandleWebhook(context.Background(), payload)
+	assert.ErrorIs(t, err, domain.ErrActiveTaskExists)
 }
 
 func TestHandleWebhook_RejectsDuplicateActive(t *testing.T) {
@@ -306,4 +362,52 @@ func TestHandleWebhook_EmptyAllowlist_AllowsAll(t *testing.T) {
 	task, err := uc.HandleWebhook(context.Background(), payload)
 	assert.NoError(t, err)
 	assert.Equal(t, domain.TaskStatusPending, task.Status)
+}
+
+func TestHandleWebhook_PRReview_UnauthorizedAuthor(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	allowedAuthors := []string{"trusted-user"}
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, allowedAuthors)
+	payload := domain.WebhookPayload{
+		TriggerType: "pr_review",
+		PRNumber:    55,
+		Title:       "Fix review",
+		Repository:  "owner/repo",
+		Author:      "random-attacker",
+	}
+
+	_, err := uc.HandleWebhook(context.Background(), payload)
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+}
+
+func TestHandleWebhook_PRReview_IssueAndPRCanCoexist(t *testing.T) {
+	t.Parallel()
+	repo := new(mockRepo)
+	q := queue.New()
+	defer q.Close()
+
+	repo.On("FindActiveByPR", mock.Anything, "owner/repo", 55).Return([]domain.Task{}, nil)
+	repo.On("Create", mock.Anything, mock.AnythingOfType("domain.Task")).Return(nil)
+
+	uc := usecase.NewTaskUsecase(repo, q, nil, domain.DockerConfig{MaxConcurrency: 1}, nil)
+	payload := domain.WebhookPayload{
+		TriggerType: "pr_review",
+		PRNumber:    55,
+		CommentID:   99999,
+		Title:       "Fix review",
+		Repository:  "owner/repo",
+		Author:      "reviewer",
+		URL:         "https://github.com/owner/repo/pull/55",
+	}
+
+	task, err := uc.HandleWebhook(context.Background(), payload)
+	assert.NoError(t, err)
+	assert.Equal(t, domain.TaskTypePRReview, task.TaskType)
+	// PR review uses FindActiveByPR, not FindActiveByIssue
+	repo.AssertNotCalled(t, "FindActiveByIssue", mock.Anything, mock.Anything, mock.Anything)
 }

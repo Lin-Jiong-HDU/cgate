@@ -55,6 +55,11 @@ func (r *runner) StartContainer(ctx context.Context, task domain.Task) (string, 
 		fmt.Sprintf("GIT_USER_NAME=%s", r.cfg.GitUserName),
 		fmt.Sprintf("GIT_USER_EMAIL=%s", r.cfg.GitUserEmail),
 		fmt.Sprintf("MAX_TURNS=%d", r.cfg.MaxTurns),
+		fmt.Sprintf("TASK_TYPE=%s", string(task.TaskType)),
+	}
+
+	if task.TaskType == domain.TaskTypePRReview {
+		env = append(env, fmt.Sprintf("PR_NUMBER=%d", task.PRNumber))
 	}
 
 	if r.baseURL != "" {

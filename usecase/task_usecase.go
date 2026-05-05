@@ -47,12 +47,22 @@ func (u *taskUsecase) HandleWebhook(ctx context.Context, payload domain.WebhookP
 		}
 	}
 
-	active, err := u.repo.FindActiveByIssue(ctx, payload.Repository, payload.IssueNumber)
-	if err != nil {
-		return domain.Task{}, fmt.Errorf("check active tasks: %w", err)
-	}
-	if len(active) > 0 {
-		return domain.Task{}, domain.ErrActiveTaskExists
+	if payload.TriggerType == "pr_review" {
+		active, err := u.repo.FindActiveByPR(ctx, payload.Repository, payload.PRNumber)
+		if err != nil {
+			return domain.Task{}, fmt.Errorf("check active pr tasks: %w", err)
+		}
+		if len(active) > 0 {
+			return domain.Task{}, domain.ErrActiveTaskExists
+		}
+	} else {
+		active, err := u.repo.FindActiveByIssue(ctx, payload.Repository, payload.IssueNumber)
+		if err != nil {
+			return domain.Task{}, fmt.Errorf("check active tasks: %w", err)
+		}
+		if len(active) > 0 {
+			return domain.Task{}, domain.ErrActiveTaskExists
+		}
 	}
 
 	task, err := domain.NewTask(payload)
@@ -64,7 +74,7 @@ func (u *taskUsecase) HandleWebhook(ctx context.Context, payload domain.WebhookP
 	}
 
 	u.queue.Enqueue(task)
-	slog.Info("task enqueued", "task_id", task.ID, "issue", task.IssueNumber, "repo", task.Repository)
+	slog.Info("task enqueued", "task_id", task.ID, "type", task.TaskType, "issue", task.IssueNumber, "pr", task.PRNumber, "repo", task.Repository)
 	return task, nil
 }
 
