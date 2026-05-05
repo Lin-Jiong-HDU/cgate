@@ -17,18 +17,27 @@ jobs:
 
     steps:
       - name: Send issue to webhook
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_REPO: ${{ github.repository }}
+          ISSUE_CREATED: ${{ github.event.issue.created_at }}
+          ISSUE_LABELS_JSON: ${{ toJson(github.event.issue.labels.*.name) }}
         run: |
-          curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
+          jq -n \
+            --arg action "opened" \
+            --argjson issue_number ${{ github.event.issue.number }} \
+            --arg title "$ISSUE_TITLE" \
+            --arg body "$ISSUE_BODY" \
+            --arg author "$ISSUE_AUTHOR" \
+            --argjson labels "$ISSUE_LABELS_JSON" \
+            --arg url "$ISSUE_URL" \
+            --arg repository "$ISSUE_REPO" \
+            --arg created_at "$ISSUE_CREATED" \
+            '{action: $action, issue_number: $issue_number, title: $title, body: $body, author: $author, labels: $labels, url: $url, repository: $repository, created_at: $created_at}' \
+          | curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
-            -d '{
-                "action": "opened",
-                "issue_number": ${{ github.event.issue.number }},
-                "title": ${{ toJson(github.event.issue.title) }},
-                "body": ${{ toJson(github.event.issue.body) }},
-                "author": "${{ github.event.issue.user.login }}",
-                "labels": ${{ toJson(github.event.issue.labels.*.name) }},
-                "url": "${{ github.event.issue.html_url }}",
-                "repository": "${{ github.repository }}",
-                "created_at": "${{ github.event.issue.created_at }}"
-              }'
+            -d @-

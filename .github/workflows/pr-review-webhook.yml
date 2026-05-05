@@ -19,19 +19,26 @@ jobs:
 
     steps:
       - name: Send PR review to webhook
+        env:
+          PR_TITLE: ${{ github.event.issue.title }}
+          PR_BODY: ${{ github.event.comment.body }}
+          PR_AUTHOR: ${{ github.event.comment.user.login }}
+          PR_URL: ${{ github.event.issue.html_url }}
+          PR_REPO: ${{ github.repository }}
+          PR_CREATED: ${{ github.event.comment.created_at }}
         run: |
-          curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
+          jq -n \
+            --arg action "created" \
+            --argjson pr_number ${{ github.event.issue.number }} \
+            --argjson comment_id ${{ github.event.comment.id }} \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg author "$PR_AUTHOR" \
+            --arg url "$PR_URL" \
+            --arg repository "$PR_REPO" \
+            --arg created_at "$PR_CREATED" \
+            '{action: $action, trigger_type: "pr_review", pr_number: $pr_number, comment_id: $comment_id, title: $title, body: $body, author: $author, url: $url, repository: $repository, created_at: $created_at}' \
+          | curl -sf -X POST "${{ secrets.WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
-            -d '{
-                "action": "created",
-                "trigger_type": "pr_review",
-                "pr_number": ${{ github.event.issue.number }},
-                "comment_id": ${{ github.event.comment.id }},
-                "title": ${{ toJson(github.event.issue.title) }},
-                "body": ${{ toJson(github.event.comment.body) }},
-                "author": "${{ github.event.comment.user.login }}",
-                "url": "${{ github.event.issue.html_url }}",
-                "repository": "${{ github.repository }}",
-                "created_at": "${{ github.event.comment.created_at }}"
-              }'
+            -d @-

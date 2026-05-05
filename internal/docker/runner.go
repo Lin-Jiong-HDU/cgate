@@ -210,12 +210,13 @@ func SanitizeEnvValue(s string) string {
 	return b.String()
 }
 
-// SanitizeShellValue strips shell command substitution patterns in addition to
-// control characters. Used for fields that flow into shell scripts where
-// expansion could occur (e.g., issue titles used in heredocs).
+// SanitizeShellValue strips shell expansion patterns in addition to control
+// characters. Used for fields that flow into shell scripts where expansion
+// could occur (e.g., issue titles used in heredocs).
 func SanitizeShellValue(s string) string {
 	s = SanitizeEnvValue(s)
 	s = strings.ReplaceAll(s, "$(", "")
+	s = strings.ReplaceAll(s, "${", "")
 	s = strings.ReplaceAll(s, "`", "")
 	return s
 }
