@@ -1,29 +1,53 @@
-# CGate
+<div align="center">
 
-Self-hosted automation gateway that connects GitHub issues to [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Create an issue titled `... [claude bot]`, and CGate spins up an isolated Docker container that runs Claude Code to implement the feature, run tests, and open a pull request — automatically.
+# 🍊 CGate
+
+**The Bridge Between GitHub Issues and Autonomous AI Development**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Lin-Jiong-HDU/cgate)](https://goreportcard.com/report/github.com/Lin-Jiong-HDU/cgate)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://www.docker.com/)
+[![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20Code-orange)](https://www.anthropic.com/)
+
+*Just open a GitHub Issue — CGate handles the rest.*
+
+</div>
+
+---
+
+CGate is a self-hosted automation gateway that connects GitHub Issues to [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Create an issue titled `... [claude bot]`, and CGate spins up an isolated Docker container that runs Claude Code to implement the feature, run tests, and open a pull request — automatically.
+
+## Why CGate?
+
+Tired of the manual cycle of cloning a repo, running AI tools, and submitting PRs by hand? CGate automates the entire workflow:
+
+- 🤖 **Automation** — Turn a GitHub Issue into a merged PR without touching your keyboard.
+- 🔒 **Isolation** — Every task runs in its own ephemeral Docker container, keeping your host clean and secure.
+- ⚡ **Efficiency** — Run up to N tasks in parallel, with automatic cleanup and full log access via REST API.
+- 🔄 **Resilience** — Survives restarts; pending tasks are re-enqueued and running containers are re-attached automatically.
 
 ## How It Works
 
 ```
-GitHub Issue [... claude bot]
-  → GitHub Actions sends webhook to CGate
-    → CGate creates a Task, enqueues it
-      → Scheduler launches an isolated Docker container
-        → Container clones repo, runs Claude Code
-          → Claude implements, tests, commits, opens a PR
-            → Container and workspace are cleaned up
+📝 Issue [... claude bot]
+  → ⚙️  GitHub Actions sends webhook to CGate
+    → 📋 CGate creates a Task and enqueues it
+      → 🐳 Scheduler launches an isolated Docker container
+        → 💻 Container clones repo and runs Claude Code
+          → 🚀 Claude implements, tests, commits, and opens a PR
+            → 🧹 Container and workspace are cleaned up automatically
 ```
 
 ## Features
 
-- **Issue-driven automation** — open a GitHub issue, get a PR
-- **Docker-isolated execution** — each task runs in its own container
-- **Auto-cleanup** — containers and workspace directories are removed after task completion
-- **Concurrency control** — configurable max parallel tasks (default: 3)
-- **Task lifecycle** — pending → running → succeeded / failed / cancelled
-- **REST API** — list, inspect, cancel, and read logs for tasks
-- **Persistence** — SQLite storage, survives restarts
-- **Recovery** — re-enqueues pending tasks and re-attaches to running containers on restart
+- 📌 **Issue-driven automation** — open a GitHub Issue, get a PR
+- 🐳 **Docker-isolated execution** — each task runs in its own container
+- 🧹 **Auto-cleanup** — containers and workspace directories are removed after task completion
+- ⚖️ **Concurrency control** — configurable max parallel tasks (default: 3)
+- 🔁 **Task lifecycle** — pending → running → succeeded / failed / cancelled
+- 🌐 **REST API** — list, inspect, cancel, and read logs for tasks
+- 💾 **Persistence** — SQLite storage, survives restarts
+- 🔄 **Recovery** — re-enqueues pending tasks and re-attaches to running containers on restart
 
 ## Quick Start
 
@@ -237,3 +261,11 @@ make docker-down        # Stop via docker compose
 ## License
 
 MIT
+
+---
+
+<div align="center">
+
+If CGate saves you time, please consider giving it a ⭐ — it helps others discover the project!
+
+</div>
